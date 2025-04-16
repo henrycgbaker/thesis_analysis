@@ -453,7 +453,7 @@ def plot_latency_dynamic(dfs):
 # ---------------------------
 # Function to Plot All Figures
 # ---------------------------
-def plot_all(dfs):
+def plot_all_vizs(dfs):
     """
     Calls all individual plotting functions.
     """
@@ -467,9 +467,11 @@ def plot_all(dfs):
 
 
 # ---------------------------
-# Main Section (Optional)
+# Main Section 
 # ---------------------------
 if __name__ == "__main__":
+    
+    from scripts.a_data_loading_cleaning import run_load_clean_diagnose_data
     csv_path = "results/controlled_results.csv"
     df = run_load_clean_diagnose_data(csv_path)
     
