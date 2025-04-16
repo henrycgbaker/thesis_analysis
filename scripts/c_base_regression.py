@@ -2,9 +2,9 @@ import statsmodels.api as sm
 import statsmodels.formula.api as smf
 import pandas as pd
 
-from scripts.a_data_loading_cleaning import (
-    df_controlled_cleaned,
-)
+from scripts.a_data_loading_cleaning import get_cleaned_df
+
+df = get_cleaned_df()
 
 # --- Convert variables to appropriate types ---
 # Ensure batch size and num_processes are numeric

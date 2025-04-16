@@ -1,5 +1,6 @@
 import pandas as pd
 import re
+import warnings
 
 # -----------------------------------------------------------------
 # 1. Define helper functions to clean column names and resolve duplicates
@@ -7,7 +8,7 @@ import re
 def clean_column(col: str) -> str:
     """
     Cleans an individual column name:
-      - Strips whitespace, replaces non-standard quotes,
+      - Strips whitespace and replaces non-standard quotes,
       - Applies special column name mappings,
       - Removes the 'variables_' prefix,
       - Simplifies per-process column names using regex patterns.
@@ -114,14 +115,14 @@ def clean_and_reorder_columns(df: pd.DataFrame, desired_order: list) -> pd.DataF
     df = df.rename(columns=mapping)
     df = resolve_duplicates(df)
     
-    # Order columns: first the ones in desired_order, then the rest.
+    # Order columns: first those in desired_order, then the remaining.
     ordered_cols = [col for col in desired_order if col in df.columns]
     remaining_cols = [col for col in df.columns if col not in desired_order]
     final_order = ordered_cols + remaining_cols
     return df[final_order]
 
 # -----------------------------------------------------------------
-# 2. Define  preferred column order (this can be tailored to your needs)
+# 2. Define preferred column order (tailor as needed)
 # -----------------------------------------------------------------
 desired_order = [
     "config_name",
@@ -132,12 +133,12 @@ desired_order = [
     "num_processes",
     # batching
     "batch_size___fixed_batching",
-    # decodeer
+    # decoder parameters
     "decoder_temperature",
     "decoder_top_k",
     "decoder_top_p",
     # latency
-    "latency_simulation_simulate"
+    "latency_simulation_simulate",
     "latency_simulation_delay_max",
     "latency_simulation_delay_min",
     "latency_simulation_simulate_burst",
@@ -158,9 +159,9 @@ desired_order = [
     "adaptive_max_tokens",
     "query_rate",
     "total_input_tokens",
-    "total_generated_tokens"
+    "total_generated_tokens",
     
-    # CONSTANT SETUP ====
+    # CONSTANT SETUP
     "date_time",
     "is_encoder_decoder",
     "task_type",
@@ -179,23 +180,22 @@ desired_order = [
     "total_params",
     "model_arch",
 
-    # Validation (should be same):
+    # Validation:
     "max_input_tokens",
     "max_output_tokens",
     "number_input_prompts",
     
-    # RESULTS =====
+    # RESULTS
     # energy
     "total_energy_kwh",
     "total_energy_joules",
-    # FLOPS
+    # FLOPS and performance
     "flops",
     "tokens_per_joule",
     "joules_per_token",
     "flops_per_joule",
     "joules_per_flop",
-    "total_inference_time_sec", 
-    # inference performance
+    "total_inference_time_sec",
     "average_latency_ms_per_batch",
     "throughput_queries_per_sec",
     "throughput_tokens_per_sec",
@@ -204,7 +204,7 @@ desired_order = [
     "cpu_memory_usage_bytes",
     # GPU utilization
     "gpu_utilization_percent_0", "gpu_utilization_percent_1", "gpu_utilization_percent_2", "gpu_utilization_percent_3",
-    # Compute mem
+    # Compute memory
     "gpu_current_memory_allocated_bytes",
     "gpu_max_memory_allocated_bytes",
     "gpu_current_memory_reserved_bytes",
@@ -225,162 +225,223 @@ desired_order = [
     "cpu_energy_total",
     "gpu_energy_total",
     "ram_energy_total",
-    # per-process_emsisisons
-    "per-process_emissions_0", "per-process_emissions_1", "per-process_emissions_2","per-process_emissions_3"
+    # per-process emissions
+    "per-process_emissions_0", "per-process_emissions_1", "per-process_emissions_2", "per-process_emissions_3"
 ]
 
 # -----------------------------------------------------------------
 # 3. Load controlled experiments CSV and clean it
 # -----------------------------------------------------------------
-df_controlled = pd.read_csv("results/controlled_results.csv")
-df_controlled_cleaned = clean_and_reorder_columns(df_controlled, desired_order)
+def load_and_clean_data(csv_path: str) -> pd.DataFrame:
+    """
+    Loads a CSV from csv_path and cleans the column names and order.
+    """
+    df = pd.read_csv(csv_path)
+    df_cleaned = clean_and_reorder_columns(df, desired_order)
+    return df_cleaned
 
-print("Columns in cleaned DataFrame:")
-print(df_controlled_cleaned.columns)
-print("\nSummary statistics:")
-print(df_controlled_cleaned.describe())
-print("--" * 50)
+def filter_by_dominant_token_count(df: pd.DataFrame, token_col='total_generated_tokens') -> pd.DataFrame:
+    original_counts = df[token_col].value_counts().sort_index()
 
-# -----------------------------------------------------------------
-# 4. Create Derived Columns:
-#    - flops_per_token: FLOPs divided by total generated tokens.
-#    - energy_per_token_kwh: Total energy (kWh) divided by total generated tokens.
-#    - divergence_energy_flops: Ratio of energy-per-token to flops-per-token.
-# -----------------------------------------------------------------
-df_controlled_cleaned['flops_per_token'] = (
-    df_controlled_cleaned['flops'] / df_controlled_cleaned['total_generated_tokens']
-)
-df_controlled_cleaned['energy_per_token_kwh'] = (
-    df_controlled_cleaned['total_energy_kwh'] / df_controlled_cleaned['total_generated_tokens']
-)
-df_controlled_cleaned['divergence_energy_flops'] = (
-    df_controlled_cleaned['energy_per_token_kwh'] / df_controlled_cleaned['flops_per_token']
-)
+    # If only one unique value, no need to filter
+    if len(original_counts) == 1:
+        print(f"✅ All rows have consistent '{token_col}' = {original_counts.index[0]}")
+        print("--" * 50)
+        return df
 
-# -----------------------------------------------------------------
-# 5. Verify that FLOPs are constant across runs (as per your experimental design)
-# -----------------------------------------------------------------
-unique_flops = df_controlled_cleaned['flops'].unique()
-print("Unique FLOPs values in controlled experiments:", unique_flops)
-print("--" * 50)
+    # Otherwise, drop all rows not matching the most common value
+    mode_val = df[token_col].mode().iloc[0]
+    dropped_rows = df[df[token_col] != mode_val]
+    dropped_row_config_names = dropped_rows['config_name'].unique()
+    filtered_df = df[df[token_col] == mode_val]
 
+    # Log warning and detailed info
+    warnings.warn(f"⚠️ Dropped {len(dropped_rows)} rows due to inconsistent '{token_col}' values", stacklevel=2)
+    print(f"⚠️ Dropped {len(dropped_rows)} rows due to inconsistent '{token_col}' values")
+    print(f"- Filtering rows to dominant '{token_col}' = {mode_val}")
+    print(f"- Retained {len(filtered_df)} of {len(df)} rows")
+    print(f"- Dropped configs: {dropped_row_config_names.tolist()}")
+    print(f"- Dropped row indices: {dropped_rows.index.tolist()}")
+    print(f"Original distribution:\n{original_counts}")
+    print("--" * 50)
 
-# -----------------------------------------------------------------
-# 6. drop columns I don't need
-# -----------------------------------------------------------------
-
-columns_to_drop = [
-    "sharding_strategy",
-    "sharding_config_fsdp_config_use_orig_params",
-    "sharding_config_fsdp_config_cpu_offload",
-    "adaptive_batching",
-    "adaptive_max_tokens",
-    "query_rate",
-    "is_encoder_decoder",
-    "task_type",
-    "available_gpu_count",
-    "gpu_model",
-    "available_cpu_count",
-    "cpu_model",
-    "os",
-    "python_version",
-    "country",
-    "region",
-    "distributed_type",
-    "decode_token_to_text",
-    "inference_type",
-    "backend",
-    "model_arch",
-    "gpu_current_memory_allocated_bytes",
-    "gpu_max_memory_allocated_bytes",
-    "gpu_current_memory_reserved_bytes",
-    "gpu_max_memory_reserved_bytes",
-    "per-process_emissions_0", "per-process_emissions_1", "per-process_emissions_2","per-process_emissions_3" # OR IS THIS NICE TO HAVE?
-]
-
-df_controlled_cleaned_dropped = df_controlled_cleaned.drop(columns=columns_to_drop, errors='ignore')
-print(f"Dropped columns: {columns_to_drop}")
-print("Columns after dropping:")
-print(df_controlled_cleaned_dropped.columns)
-print("--" * 50)
-
-# second round of dropping (at some point come back to these)
-columns_to_drop_2 = [
-    "cpu_usage_percent",
-    "cpu_memory_usage_bytes",
-    "gpu_utilization_percent_0",
-    "gpu_utilization_percent_1",
-    "gpu_utilization_percent_2",
-    "gpu_utilization_percent_3",
-    "gpu_current_memory_allocated_bytes",
-    "gpu_max_memory_allocated_bytes",
-    "cpu_current_memory_allocated_bytes",
-    "cpu_max_memory_allocated_bytes",
-    "cpu_power_process_0",
-    "cpu_power_process_1",
-    "cpu_power_process_2",
-    "cpu_power_process_3",
-    "gpu_power_process_0",
-    "gpu_power_process_1",
-    "gpu_power_process_2",
-    "gpu_power_process_3",
-    "ram_power_process_0",
-    "ram_power_process_1",
-    "ram_power_process_2",
-    "ram_power_process_3",
-    "cpu_energy_process_0",
-    "cpu_energy_process_1",
-    "cpu_energy_process_2",
-    "cpu_energy_process_3",
-    "gpu_energy_process_0",
-    "gpu_energy_process_1",
-    "gpu_energy_process_2",
-    "gpu_energy_process_3",
-    "ram_energy_process_0",
-    "ram_energy_process_1",
-    "ram_energy_process_2",
-    "ram_energy_process_3",
-    "total_energy_joules_process_0",
-    "total_energy_joules_process_1",
-    "total_energy_joules_process_2",
-    "total_energy_joules_process_3",
-    "cpu_power_avg",
-    "ram_energy_total",
-    "models"
-]
-
-df_controlled_cleaned_dropped_2 = df_controlled_cleaned_dropped.drop(columns=columns_to_drop_2, errors='ignore')
-print(f"Dropped columns: {columns_to_drop_2}")
-print("Columns after dropping:")
-print(df_controlled_cleaned_dropped_2.columns)
-print("--" * 50)
+    return filtered_df
 
 # -----------------------------------------------------------------
-# 6. if necessary identify why flops different
+# 4. Create Derived Columns
 # -----------------------------------------------------------------
-def identify_flop_differentiators(df, flops_col='flops', exclude_cols=None):
+def create_derived_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Create derived columns:
+      - flops_per_token,
+      - energy_per_token_kwh,
+      - divergence_energy_flops.
+    """
+    df = df.copy()
+    df['flops_per_token'] = df['flops'] / df['total_generated_tokens']
+    df['energy_per_token_kwh'] = df['total_energy_kwh'] / df['total_generated_tokens']
+    df['divergence_energy_flops'] = df['energy_per_token_kwh'] / df['flops_per_token']
+    return df
+
+# -----------------------------------------------------------------
+# 5. Drop unused columns (two rounds)
+# -----------------------------------------------------------------
+
+def drop_unused_columns_1(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Drop a first set of predefined columns that are not needed.
+    """
+    columns_to_drop_1 = [
+        "sharding_strategy",
+        "sharding_config_fsdp_config_use_orig_params",
+        "sharding_config_fsdp_config_cpu_offload",
+        "adaptive_batching",
+        "adaptive_max_tokens",
+        "query_rate",
+        "is_encoder_decoder",
+        "task_type",
+        "available_gpu_count",
+        "gpu_model",
+        "available_cpu_count",
+        "cpu_model",
+        "os",
+        "python_version",
+        "country",
+        "region",
+        "distributed_type",
+        "decode_token_to_text",
+        "inference_type",
+        "backend",
+        "model_arch",
+        "gpu_current_memory_allocated_bytes",
+        "gpu_max_memory_allocated_bytes",
+        "gpu_current_memory_reserved_bytes",
+        "gpu_max_memory_reserved_bytes",
+        "per-process_emissions_0", "per-process_emissions_1", "per-process_emissions_2", "per-process_emissions_3"
+    ]
+    return df.drop(columns=columns_to_drop_1, errors='ignore')
+
+def drop_unused_columns_2(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Drop a second set of predefined columns that are not needed.
+    """
+    columns_to_drop_2 = [
+        "cpu_usage_percent",
+        "cpu_memory_usage_bytes",
+        "gpu_utilization_percent_0",
+        "gpu_utilization_percent_1",
+        "gpu_utilization_percent_2",
+        "gpu_utilization_percent_3",
+        "gpu_current_memory_allocated_bytes",
+        "gpu_max_memory_allocated_bytes",
+        "cpu_current_memory_allocated_bytes",
+        "cpu_max_memory_allocated_bytes",
+        "cpu_power_process_0",
+        "cpu_power_process_1",
+        "cpu_power_process_2",
+        "cpu_power_process_3",
+        "gpu_power_process_0",
+        "gpu_power_process_1",
+        "gpu_power_process_2",
+        "gpu_power_process_3",
+        "ram_power_process_0",
+        "ram_power_process_1",
+        "ram_power_process_2",
+        "ram_power_process_3",
+        "cpu_energy_process_0",
+        "cpu_energy_process_1",
+        "cpu_energy_process_2",
+        "cpu_energy_process_3",
+        "gpu_energy_process_0",
+        "gpu_energy_process_1",
+        "gpu_energy_process_2",
+        "gpu_energy_process_3",
+        "ram_energy_process_0",
+        "ram_energy_process_1",
+        "ram_energy_process_2",
+        "ram_energy_process_3",
+        "total_energy_joules_process_0",
+        "total_energy_joules_process_1",
+        "total_energy_joules_process_2",
+        "total_energy_joules_process_3",
+        "cpu_power_avg",
+        "ram_energy_total",
+        "models"
+    ]
+    return df.drop(columns=columns_to_drop_2, errors='ignore')
+
+# -----------------------------------------------------------------
+# 6. Additional helper functions for diagnostics
+# -----------------------------------------------------------------
+
+import warnings
+import pandas as pd
+
+def verify_flops(df: pd.DataFrame, flops_col='flops') -> None:
+    """
+    Verify that the FLOPs values are constant across runs.
+    Prints detailed diagnostic info similar to filtering functions.
+    """
+    unique_flops = df[flops_col].unique()
+    original_counts = df[flops_col].value_counts().sort_index()
+    
+    if len(unique_flops) == 1:
+        print(f"✅ FLOPs value is constant: {unique_flops[0]}")
+        print(f"Original distribution:\n{original_counts}")
+    else:
+        warnings.warn(f"⚠️ FLOPs values are NOT constant: {unique_flops}", stacklevel=2)
+        print(f"⚠️ FLOPs values are NOT constant: {unique_flops}")
+        print(f"Original distribution:\n{original_counts}")
+        
+        # Identify rows that do not have the dominant FLOPs value
+        dominant_flops = df[flops_col].mode().iloc[0]
+        deviating_rows = df[df[flops_col] != dominant_flops]
+        deviating_configs = []
+        if 'config_name' in df.columns:
+            deviating_configs = deviating_rows['config_name'].unique().tolist()
+        
+        print(f"- Dominant FLOPs value: {dominant_flops}")
+        print(f"- Affected rows count: {len(deviating_rows)}")
+        print(f"- Affected row indices: {deviating_rows.index.tolist()}")
+        if deviating_configs:
+            print(f"- Affected configs: {deviating_configs}")
+    print("--" * 50)
+
+def verify_generated_tokens(df: pd.DataFrame, total_generated_tokens_col='total_generated_tokens') -> None:
+    """
+    Verify that the total_generated_tokens values are constant across runs.
+    Prints detailed diagnostic info similar to filtering functions.
+    """
+    unique_tokens = df[total_generated_tokens_col].unique()
+    original_counts = df[total_generated_tokens_col].value_counts().sort_index()
+    
+    if len(unique_tokens) == 1:
+        print(f"✅ Total generated tokens value is constant: {unique_tokens[0]}")
+        print(f"Original distribution:\n{original_counts}")
+    else:
+        warnings.warn(f"⚠️ Total generated tokens values are NOT constant: {unique_tokens}", stacklevel=2)
+        print(f"⚠️ Total generated tokens values are NOT constant: {unique_tokens}")
+        print(f"Original distribution:\n{original_counts}")
+        
+        # Identify rows that do not have the dominant generated tokens value
+        dominant_token = df[total_generated_tokens_col].mode().iloc[0]
+        deviating_rows = df[df[total_generated_tokens_col] != dominant_token]
+        deviating_configs = []
+        if 'config_name' in df.columns:
+            deviating_configs = deviating_rows['config_name'].unique().tolist()
+        
+        print(f"- Dominant token count: {dominant_token}")
+        print(f"- Affected rows count: {len(deviating_rows)}")
+        print(f"- Affected row indices: {deviating_rows.index.tolist()}")
+        if deviating_configs:
+            print(f"- Affected configs: {deviating_configs}")
+    print("--" * 50)
+
+
+def identify_flop_differentiators(df: pd.DataFrame, flops_col='flops', exclude_cols=None):
     """
     Identify columns that are constant within each FLOP group but differ between groups.
-    
-    Parameters:
-      df (pd.DataFrame): The DataFrame containing the data.
-      flops_col (str): Name of the column used for grouping the FLOPs.
-      exclude_cols (list, optional): List of columns to exclude from the comparison.
-      
-    Returns:
-      dict: A dictionary where keys are the column names that differentiate FLOP groups,
-            and values are dictionaries mapping each unique FLOP value to the constant value
-            observed in that group.
-            
-    Example output:
-    {
-      'config_name': {1034544128000: 'A1_Max_Throughput_Exploit', 
-                      16949970993152: 'A5_Parallel_Overdrive'},
-      'some_other_col': {1034544128000: 'value1', 
-                         16949970993152: 'value2'}
-    }
     """
-    # Optionally exclude some columns, including the flops column itself.
     if exclude_cols is None:
         exclude_cols = []
     exclude_cols = set(exclude_cols + [flops_col])
@@ -388,27 +449,118 @@ def identify_flop_differentiators(df, flops_col='flops', exclude_cols=None):
     differentiators = {}
     unique_flops = df[flops_col].unique()
     
-    # Loop over each column in df excluding the ones in exclude_cols.
+    # Loop over each column in df excluding those in exclude_cols.
     for col in df.columns:
         if col in exclude_cols:
             continue
         
-        # For each group (by flops), get the unique values for this column.
         group_values = {}
-        valid = True  # assume column is constant per group unless we find more than one unique value.
+        valid = True
         for flop in unique_flops:
-            values = df[df[flops_col] == flop][col].unique()
+            subset = df.loc[df[flops_col] == flop, col]
+            if isinstance(subset, pd.DataFrame):
+                subset = subset.iloc[:, 0]  # ensure it's a Series
+            values = subset.unique()
             if len(values) == 1:
                 group_values[flop] = values[0]
             else:
-                # If any FLOP group has more than one value, then this column doesn't differentiate consistently.
                 valid = False
                 break
-        # Check if the column is valid and if it truly differentiates between groups.
         if valid and len(set(group_values.values())) > 1:
             differentiators[col] = group_values
     
     return differentiators
 
-# implement this if necessary
+def identify_total_generated_tokens_differentiators(df: pd.DataFrame, total_generated_tokens_col='total_generated_tokens', exclude_cols=None):
+    """
+    Identify columns that are constant within each total_generated_tokens group but differ between groups.
+    """
+    if exclude_cols is None:
+        exclude_cols = []
+    exclude_cols = set(exclude_cols + [total_generated_tokens_col])
+    
+    differentiators = {}
+    unique_values = df[total_generated_tokens_col].unique()
+    
+    for col in df.columns:
+        if col in exclude_cols:
+            continue
+        
+        group_values = {}
+        valid = True
+        for val in unique_values:
+            subset = df.loc[df[total_generated_tokens_col] == val, col]
+            if isinstance(subset, pd.DataFrame):
+                subset = subset.iloc[:, 0]  # ensure it's a Series
+            values = subset.unique()
+            if len(values) == 1:
+                group_values[val] = values[0]
+            else:
+                valid = False
+                break
+        if valid and len(set(group_values.values())) > 1:
+            differentiators[col] = group_values
+
+    return differentiators
+
+
 # -----------------------------------------------------------------
+# 7. wrap pipeline
+# -----------------------------------------------------------------
+
+def run_load_clean_diagnose_data(csv_path: str = "results/controlled_results.csv") -> pd.DataFrame:
+    # Load and clean data
+    df = load_and_clean_data(csv_path)
+    df = create_derived_columns(df)
+    df = filter_by_dominant_token_count(df)
+    
+    # Drop unused columns
+    df = drop_unused_columns_1(df)
+    df = drop_unused_columns_2(df)
+    
+    # Diagnostics / sanity checks
+    verify_flops(df)
+    verify_generated_tokens(df)
+    
+    # Identify differentiators for FLOPs
+    unique_flops = df['flops'].unique()
+    if unique_flops.size > 1:
+        print("Identifying differentiators for FLOPs...")
+        flop_diff = identify_flop_differentiators(df)
+        print("FLOP Differentiators:")
+        for col, vals in flop_diff.items():
+            print(f"{col}: {vals}")
+    
+    # Identify differentiators for total_generated_tokens
+    unique_tokens = df['total_generated_tokens'].unique()
+    if unique_tokens.size > 1:
+        print("Identifying differentiators for total_generated_tokens...")
+        token_diff = identify_total_generated_tokens_differentiators(df)
+        print("Total Generated Tokens Differentiators:")
+        for col, vals in token_diff.items():
+            print(f"{col}: {vals}")
+    
+    print("--" * 50)
+    return df
+
+
+# -----------------------------------------------------------------
+# 8. Main execution block
+# -----------------------------------------------------------------
+if __name__ == "__main__":
+    
+    csv_path = "results/controlled_results.csv"
+    
+    df = get_cleaned_df(csv_path)
+    
+    print("--" * 50)
+    
+    print("\n== FINAL DATA ==")
+    print("\n-- Columns in DataFrame:--")
+    print(df.columns)
+    print("\n-- Summary statistics:--")
+    print(df.describe())
+    print("--" * 50)
+
+    # expose final df to namespace
+    globals()['df'] = df
