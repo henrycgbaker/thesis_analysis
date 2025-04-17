@@ -1,45 +1,86 @@
+import pandas as pd
+import matplotlib.pyplot as plt
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
-import pandas as pd
 
-from scripts.a_data_loading_cleaning import get_cleaned_df
+# -----------------------------
+# 1. Preprocessing
+# -----------------------------
+def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Converts relevant variables to numeric or categorical types as needed.
+    """
+    df = df.copy()
+    df['batch_size_numeric'] = pd.to_numeric(df['batch_size___fixed_batching'], errors='coerce')
+    df['num_processes'] = pd.to_numeric(df['num_processes'], errors='coerce')
+    df['fp_precision'] = df['fp_precision'].astype('category')
+    df['quantization'] = df['quantization'].astype('category')
+    return df
 
-df = get_cleaned_df()
 
-# --- Convert variables to appropriate types ---
-# Ensure batch size and num_processes are numeric
-df_controlled_cleaned['batch_size_numeric'] = pd.to_numeric(df_controlled_cleaned['batch_size___fixed_batching'], errors='coerce')
-df_controlled_cleaned['num_processes'] = pd.to_numeric(df_controlled_cleaned['num_processes'], errors='coerce')
+# -----------------------------
+# 2. Run OLS regression
+# -----------------------------
+def run_ols_model(df: pd.DataFrame, formula: str):
+    """
+    Fits an OLS regression model using the specified formula.
+    Returns the fitted model object.
+    """
+    model = smf.ols(formula=formula, data=df).fit()
+    print(model.summary())
+    return model
 
-# Convert precision and quantization to categorical types.
-df_controlled_cleaned['fp_precision'] = df_controlled_cleaned['fp_precision'].astype('category')
-df_controlled_cleaned['quantization'] = df_controlled_cleaned['quantization'].astype('category')
 
-# --- Define the regression formula ---
-# Here the model predicts energy consumption per token based on batch size, number of processes, and the categorical variables.
-formula = "energy_per_token_kwh ~ batch_size_numeric + num_processes + C(fp_precision) + C(quantization)"
+# -----------------------------
+# 3. Diagnostics plot
+# -----------------------------
+def plot_residuals(model, x_label='Fitted Values', y_label='Residuals', title='Fitted vs Residuals'):
+    """
+    Plots residuals vs. fitted values for regression diagnostics.
+    """
+    plt.figure(figsize=(10, 6))
+    plt.scatter(model.fittedvalues, model.resid, alpha=0.6)
+    plt.axhline(0, color='red', linestyle='--')
+    plt.xlabel(x_label)
+    plt.ylabel(y_label)
+    plt.title(title)
+    plt.grid(True)
+    plt.show()
 
-# Fit the regression model using Ordinary Least Squares (OLS)
-model_energy = smf.ols(formula, data=df_controlled_cleaned).fit()
 
-# Print the regression results summary
-print(model_energy.summary())
+# -----------------------------
+# 4. Full regression workflow
+# -----------------------------
+def run_full_regression_analysis(df: pd.DataFrame, predictors: list = None):
+    """
+    Run OLS regressions on two dependent variables using given predictors.
+    """
+    default_predictors = ['batch_size_numeric', 'num_processes', 'C(fp_precision)', 'C(quantization)']
+    predictors = predictors or default_predictors
+    rhs = ' + '.join(predictors)
 
-# --- Optionally, build a model on the divergence metric ---
-# For instance, divergence_energy_flops as dependent variable.
-formula_divergence = "divergence_energy_flops ~ batch_size_numeric + num_processes + C(fp_precision) + C(quantization)"
-model_divergence = smf.ols(formula_divergence, data=df_controlled_cleaned).fit()
-print(model_divergence.summary())
+    print("\n📊 Running OLS regression for energy_per_token_kwh...\n")
+    energy_formula = f"energy_per_token_kwh ~ {rhs}"
+    model_energy = run_ols_model(df, energy_formula)
 
-# --- Regression Diagnostics ---
-# Plot fitted values vs. residuals for the energy model for diagnostic purposes.
-import matplotlib.pyplot as plt
+    print("\n📊 Running OLS regression for divergence_energy_flops...\n")
+    divergence_formula = f"divergence_energy_flops ~ {rhs}"
+    model_divergence = run_ols_model(df, divergence_formula)
 
-plt.figure(figsize=(10, 6))
-plt.scatter(model_energy.fittedvalues, model_energy.resid, alpha=0.6)
-plt.axhline(0, color='red', linestyle='--')
-plt.xlabel('Fitted Energy per Token (kWh)')
-plt.ylabel('Residuals')
-plt.title('Fitted Values vs. Residuals')
-plt.grid(True)
-plt.show()
+    print("\n📈 Plotting residuals for energy model...")
+    plot_residuals(
+        model_energy,
+        x_label='Fitted Energy per Token (kWh)',
+        y_label='Residuals',
+        title='Energy Model: Fitted Values vs Residuals'
+    )
+
+
+# -----------------------------
+# 5. Script entry point
+# -----------------------------
+if __name__ == "__main__":
+    csv_path = "results/controlled_results.csv"
+    df = get_cleaned_df(csv_path)
+    df = preprocess_data(df)
+    run_full_regression_analysis(df)
