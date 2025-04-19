@@ -1,6 +1,11 @@
 import pandas as pd
 import re
 import warnings
+from typing import (
+    Union,
+    Sequence,
+    Optional
+)
 
 # -----------------------------------------------------------------
 # 1. Define helper functions to clean column names and resolve duplicates
@@ -503,9 +508,56 @@ def identify_total_generated_tokens_differentiators(df: pd.DataFrame, total_gene
 
     return differentiators
 
+# -----------------------------------------------------------------
+# 7. aggregate config grouping metrics across runs
+# -----------------------------------------------------------------
+
+def add_config_group_stats(
+    df: pd.DataFrame,
+    group_by: Union[str, Sequence[str]] = 'config_name',
+    cols: Optional[Sequence[str]] = None
+) -> pd.DataFrame:
+    """
+    For each column in `cols`, adds two new columns:
+      • {col}_mean  = group-by mean of col
+      • {col}_std   = group-by std  of col
+    Keeps all original rows.
+    
+    """
+    df_out = df.copy()
+    
+    if isinstance(group_by, str):
+        group_by = [group_by]
+    
+    if cols is None:
+        cols = [
+            'total_energy_kwh',
+            'total_inference_time_sec',
+            'average_latency_ms_per_batch',
+            'throughput_queries_per_sec',
+            'throughput_tokens_per_sec',
+            'cpu_energy_total',
+            'gpu_energy_total',
+            'flops',
+            'flops_per_token',
+            'energy_per_token_kwh',
+            'divergence_energy_flops'
+        ]
+    
+    # sanity check
+    missing = [c for c in group_by + cols if c not in df_out.columns]
+    if missing:
+        raise KeyError(f"These columns are missing: {missing}")
+    
+    # compute transform for each metric
+    for c in cols:
+        df_out[f"{c}_mean"] = df_out.groupby(group_by)[c].transform('mean')
+        df_out[f"{c}_std"]  = df_out.groupby(group_by)[c].transform('std')
+    
+    return df_out
 
 # -----------------------------------------------------------------
-# 7. wrap pipeline
+# 8. wrap pipeline
 # -----------------------------------------------------------------
 
 def run_load_clean_diagnose_data(csv_path: str = "results/controlled_results.csv") -> pd.DataFrame:
@@ -540,27 +592,32 @@ def run_load_clean_diagnose_data(csv_path: str = "results/controlled_results.csv
         for col, vals in token_diff.items():
             print(f"{col}: {vals}")
     
-    print("--" * 50)
+    df = add_config_group_stats(df)
+    
     return df
 
 
 # -----------------------------------------------------------------
-# 8. Main execution block
+# 9. Main execution block
 # -----------------------------------------------------------------
 if __name__ == "__main__":
-    
     csv_path = "results/controlled_results.csv"
-    
-    df = get_cleaned_df(csv_path)
-    
-    print("--" * 50)
-    
-    print("\n== FINAL DATA ==")
-    print("\n-- Columns in DataFrame:--")
-    print(df.columns)
-    print("\n-- Summary statistics:--")
-    print(df.describe())
-    print("--" * 50)
 
-    # expose final df to namespace
-    globals()['df'] = df
+    # 1) load & globally clean column names + reorder
+    df = load_and_clean_data(csv_path)
+
+    # 2) create derived columns
+    df = create_derived_columns(df)
+
+    # 3) filter / diagnostics / drop unused…
+    df = filter_by_dominant_token_count(df)
+    df = drop_unused_columns_1(df)
+    df = drop_unused_columns_2(df)
+    verify_flops(df)
+    verify_generated_tokens(df)
+
+    # 4) finally aggregate
+    df = add_config_group_stats(df)
+
+    # store for interactive use
+    globals()['df'] = df_agg

@@ -1,454 +1,499 @@
-#!/usr/bin/env python
-"""
-Dynamic Plotting Script for Performance Metrics
-
-This script defines a series of helper functions that dynamically generate plots
-for various configurations:
-  - Number of Processes
-  - Batching (Batch Size)
-  - Precision
-  - Decoding (Temperature, top_k / top_p)
-  - Latency
-
-Each function adjusts automatically to the underlying data (e.g. dynamic x-ticks,
-groupings, and color assignments) so that changes in the configuration values are
-handled without code modifications.
-
-Usage:
-  • In your notebook, import these functions and call them individually, for example:
-      plot_num_processes(dfs)
-  • Or, run the script directly to generate all figures using the plot_all(dfs) function.
-  
-Ensure you have your master DataFrame “df” loaded and then create the dfs dictionary as above.
-"""
-
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-import warnings
+
+
+def _plot_with_band(ax, raw_df, x_col, y_col, mean_df, mean_col, std_col,
+                    color, raw_kwargs=None, band_alpha=0.2,
+                    label_mean="Mean", label_band="±1 std", label_raw="Raw"):
+    """
+    Plot raw scatter and a smoothed mean ± std band on ax.
+    Maps categorical x to numeric positions if needed.
+    """
+    raw_kwargs = raw_kwargs or {}
+
+    # Determine positions for x-axis
+    idx_str = mean_df.index.astype(str)
+    try:
+        positions = idx_str.astype(float)
+    except ValueError:
+        positions = np.arange(len(idx_str))
+        ax.set_xticks(positions)
+        ax.set_xticklabels(idx_str)
+    # Map raw x to positions
+    mapping = {str(v): p for v, p in zip(idx_str, positions)}
+    raw_x = raw_df[x_col].astype(str).map(mapping)
+
+    # Scatter raw points
+    if label_raw:
+        ax.scatter(raw_x, raw_df[y_col],
+                   color=color, alpha=raw_kwargs.get('alpha',0.3),
+                   marker=raw_kwargs.get('marker','o'),
+                   label=label_raw)
+
+    # Compute mean and std arrays
+    mean_vals = mean_df[mean_col].values
+    std_vals = mean_df[std_col].fillna(0).values
+    lower = mean_vals - std_vals
+    upper = mean_vals + std_vals
+
+    if len(positions) > 1:
+        # Smooth interpolation
+        x_fine = np.linspace(positions.min(), positions.max(), 200)
+        mean_fine = np.interp(x_fine, positions, mean_vals)
+        low_fine = np.interp(x_fine, positions, lower)
+        up_fine = np.interp(x_fine, positions, upper)
+        # Plot mean line
+        ax.plot(x_fine, mean_fine, linestyle='-', color=color, label=label_mean)
+        # Plot band
+        if label_band:
+            ax.fill_between(x_fine, low_fine, up_fine, color=color, alpha=band_alpha, label=label_band)
+    else:
+        # Single point
+        ax.plot(positions, mean_vals,
+                marker=raw_kwargs.get('marker','o'), linestyle='-', color=color,
+                label=label_mean)
+        if label_band:
+            ax.fill_between(positions, lower, upper, color=color, alpha=band_alpha, label=label_band)
 
 
 # ---------------------------
-# Plot for Number of Processes
+# Plot: Number of Processes
 # ---------------------------
 def plot_num_processes(dfs):
-    """
-    Plots Energy- and FLOPs-per-Token vs Number of Processes (from dfs['num_processes']).
-    """
-    if 'num_processes' not in dfs:
+    df = dfs.get('num_processes')
+    if df is None:
         print("num_processes DataFrame not found in dfs.")
         return
-    
-    num_proc_df = dfs['num_processes'].copy()
-    num_proc_df['num_processes'] = num_proc_df['num_processes'].astype(int)
+    df = df.copy()
+    df['num_processes'] = df['num_processes'].astype(int)
 
-    fig, ax1 = plt.subplots(figsize=(8, 6))
-    color_energy = 'tab:blue'
-    ax1.set_xlabel('Number of Processes')
-    ax1.set_ylabel('Energy-per-Token (kWh)', color=color_energy)
-    ax1.plot(num_proc_df['num_processes'], num_proc_df['energy_per_token_kwh'],
-             marker='o', linestyle='-', color=color_energy, label='Energy-per-Token (kWh)')
-    ax1.set_ylim(bottom=0)
-    ax1.tick_params(axis='y', labelcolor=color_energy)
-    ax1.set_xticks(sorted(num_proc_df['num_processes'].unique()))
+    # Stats
+    energy_stats = df.groupby('num_processes').agg(
+        energy_mean=('energy_per_token_kwh','mean'),
+        energy_std =('energy_per_token_kwh','std')
+    )
+    flops_stats = df.groupby('num_processes').agg(
+        flops_mean=('flops_per_token','mean'),
+        flops_std =('flops_per_token','std')
+    )
 
+    fig, ax1 = plt.subplots(figsize=(8,6))
     ax2 = ax1.twinx()
-    color_flops = 'tab:red'
-    ax2.set_ylabel('FLOPs-per-Token', color=color_flops)
-    ax2.plot(num_proc_df['num_processes'], num_proc_df['flops_per_token'],
-             marker='s', linestyle='--', color=color_flops, label='FLOPs-per-Token')
-    ax2.tick_params(axis='y', labelcolor=color_flops)
+    # Energy
+    _plot_with_band(
+        ax1, df, 'num_processes', 'energy_per_token_kwh',
+        energy_stats, 'energy_mean','energy_std',
+        color='tab:blue',
+        raw_kwargs={'alpha':0.3,'marker':'o'},
+        label_mean='Mean energy', label_band='±1 std', label_raw='Raw energy'
+    )
+    ax1.set_xlabel('Number of Processes')
+    ax1.set_ylabel('Energy-per-Token (kWh)', color='tab:blue')
+    ax1.tick_params(axis='y', labelcolor='tab:blue')
 
-    lines1, labels1 = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2, loc='best')
+    # FLOPs
+    _plot_with_band(
+        ax2, df, 'num_processes', 'flops_per_token',
+        flops_stats, 'flops_mean','flops_std',
+        color='tab:red',
+        raw_kwargs={'alpha':0.3,'marker':'s'},
+        label_mean='Mean FLOPs', label_band=None, label_raw='Raw FLOPs'
+    )
+    ax2.set_ylabel('FLOPs-per-Token', color='tab:red')
+    ax2.tick_params(axis='y', labelcolor='tab:red')
 
-    plt.title('Energy- & FLOPs-per-Token vs Number of Processes')
-    fig.tight_layout()
+    lines1, labs1 = ax1.get_legend_handles_labels()
+    lines2, labs2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1+lines2, labs1+labs2, loc='best')
+
+    plt.title('Energy & FLOPs-per-Token vs Number of Processes')
+    plt.tight_layout()
     plt.show()
 
 
 # ---------------------------
-# Plot for Batching (Batch Size)
+# Plot: Batching
 # ---------------------------
 def plot_batching(dfs):
-    """
-    Plots Energy- and FLOPs-per-Token vs Batch Size (from dfs['batching']).
-    Dynamically sets the x-ticks based on the minimum and maximum batch sizes.
-    """
-    if 'batching' not in dfs:
+    df = dfs.get('batching')
+    if df is None:
         print("batching DataFrame not found in dfs.")
         return
+    df = df.copy()
+    df['batch_size'] = df['batch_size___fixed_batching'].astype(int)
 
-    batching_df = dfs['batching'].copy()
-    batching_df['batch_size___fixed_batching'] = batching_df['batch_size___fixed_batching'].astype(int)
+    energy_stats = df.groupby('batch_size').agg(
+        energy_mean=('energy_per_token_kwh','mean'),
+        energy_std =('energy_per_token_kwh','std')
+    )
+    flops_stats = df.groupby('batch_size').agg(
+        flops_mean=('flops_per_token','mean'),
+        flops_std =('flops_per_token','std')
+    )
 
-    fig, ax1 = plt.subplots(figsize=(8, 6))
-    color_energy = 'tab:blue'
-    ax1.set_xlabel('Batch Size')
-    ax1.set_ylabel('Energy-per-Token (kWh)', color=color_energy)
-    ax1.plot(batching_df['batch_size___fixed_batching'], batching_df['energy_per_token_kwh'],
-             marker='o', linestyle='-', color=color_energy, label='Energy-per-Token (kWh)')
-    ax1.set_ylim(bottom=0)
-    ax1.tick_params(axis='y', labelcolor=color_energy)
-    min_bs = batching_df['batch_size___fixed_batching'].min()
-    max_bs = batching_df['batch_size___fixed_batching'].max()
-    ax1.set_xticks(np.arange(min_bs, max_bs + 1, 8))
-
+    fig, ax1 = plt.subplots(figsize=(8,6))
     ax2 = ax1.twinx()
-    color_flops = 'tab:red'
-    ax2.set_ylabel('FLOPs-per-Token', color=color_flops)
-    ax2.plot(batching_df['batch_size___fixed_batching'], batching_df['flops_per_token'],
-             marker='s', linestyle='--', color=color_flops, label='FLOPs-per-Token')
-    ax2.tick_params(axis='y', labelcolor=color_flops)
 
-    lines1, labels1 = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2, loc='best')
+    _plot_with_band(
+        ax1, df, 'batch_size','energy_per_token_kwh',
+        energy_stats,'energy_mean','energy_std',
+        'tab:blue', raw_kwargs={'alpha':0.3,'marker':'o'},
+        label_mean='Mean energy', label_band='±1 std', label_raw='Raw energy'
+    )
+    ax1.set_xlabel('Batch Size')
+    ax1.set_ylabel('Energy-per-Token (kWh)', color='tab:blue')
+    ax1.tick_params(axis='y', labelcolor='tab:blue')
 
-    plt.title('Energy- & FLOPs-per-Token vs Batch Size')
-    fig.tight_layout()
+    _plot_with_band(
+        ax2, df, 'batch_size','flops_per_token',
+        flops_stats,'flops_mean','flops_std',
+        'tab:red', raw_kwargs={'alpha':0.3,'marker':'s'},
+        label_mean='Mean FLOPs', label_band=None, label_raw='Raw FLOPs'
+    )
+    ax2.set_ylabel('FLOPs-per-Token', color='tab:red')
+    ax2.tick_params(axis='y', labelcolor='tab:red')
+
+    lines1, labs1 = ax1.get_legend_handles_labels()
+    lines2, labs2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1+lines2, labs1+labs2, loc='best')
+
+    plt.title('Energy & FLOPs-per-Token vs Batch Size')
+    plt.tight_layout()
     plt.show()
 
 
 # ---------------------------
-# Plot for Precision
+# Plot: Precision
 # ---------------------------
 def plot_precision(dfs):
-    """
-    Plots Energy- and FLOPs-per-Token vs Precision (from dfs['precis']).
-    Dynamically categorizes precision into FP32, FP16, INT8, and INT4.
-    """
-    if 'precis' not in dfs:
+    df = dfs.get('precis')
+    if df is None:
         print("precis DataFrame not found in dfs.")
         return
-    
-    precision_df = dfs['precis'].copy()
+    df = df.copy()
+    def mode(r):
+        if r.get('load_in_4bit'): return 'INT4'
+        if r.get('load_in_8bit'): return 'INT8'
+        if r.get('fp_precision')=='torch.float16': return 'FP16'
+        return 'FP32'
+    df['mode'] = pd.Categorical(df.apply(mode,axis=1),
+                                 categories=['FP32','FP16','INT8','INT4'],ordered=True)
 
-    def determine_precision(row):
-        if row.get('load_in_4bit', False):
-            return 'INT4'
-        elif row.get('load_in_8bit', False):
-            return 'INT8'
-        elif row.get('fp_precision') == 'torch.float16':
-            return 'FP16'
-        else:
-            return 'FP32'
+    energy_stats = df.groupby('mode').agg(
+        energy_mean=('energy_per_token_kwh','mean'),
+        energy_std =('energy_per_token_kwh','std')
+    )
+    flops_stats = df.groupby('mode').agg(
+        flops_mean=('flops_per_token','mean'),
+        flops_std =('flops_per_token','std')
+    )
 
-    precision_df['precision_mode'] = precision_df.apply(determine_precision, axis=1)
-    precision_order = ['FP32', 'FP16', 'INT8', 'INT4']
-    precision_df['precision_mode'] = pd.Categorical(precision_df['precision_mode'], categories=precision_order, ordered=True)
-    precision_df = precision_df.sort_values('precision_mode')
-
-    fig, ax1 = plt.subplots(figsize=(8, 6))
-    color_energy = 'tab:blue'
-    ax1.set_xlabel('Precision')
-    ax1.set_ylabel('Energy-per-Token (kWh)', color=color_energy)
-    ax1.plot(precision_df['precision_mode'], precision_df['energy_per_token_kwh'],
-             marker='o', linestyle='-', color=color_energy, label='Energy-per-Token (kWh)')
-    ax1.set_ylim(bottom=0)
-    ax1.tick_params(axis='y', labelcolor=color_energy)
-    ax1.grid(True)
-
+    fig, ax1 = plt.subplots(figsize=(8,6))
     ax2 = ax1.twinx()
-    color_flops = 'tab:red'
-    ax2.set_ylabel('FLOPs-per-Token', color=color_flops)
-    ax2.plot(precision_df['precision_mode'], precision_df['flops_per_token'],
-             marker='s', linestyle='--', color=color_flops, label='FLOPs-per-Token')
-    ax2.tick_params(axis='y', labelcolor=color_flops)
 
-    lines1, labels1 = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2, loc='best')
+    _plot_with_band(
+        ax1, df, 'mode','energy_per_token_kwh',
+        energy_stats,'energy_mean','energy_std',
+        'tab:blue', raw_kwargs={'alpha':0.3,'marker':'o'},
+        label_mean='Mean energy', label_band='±1 std', label_raw='Raw energy'
+    )
+    ax1.set_xlabel('Precision')
+    ax1.set_ylabel('Energy-per-Token (kWh)', color='tab:blue')
+    ax1.tick_params(axis='y', labelcolor='tab:blue')
 
-    plt.title('Energy- and FLOPs-per-Token vs Precision')
-    fig.tight_layout()
+    _plot_with_band(
+        ax2, df, 'mode','flops_per_token',
+        flops_stats,'flops_mean','flops_std',
+        'tab:red', raw_kwargs={'alpha':0.3,'marker':'s'},
+        label_mean='Mean FLOPs', label_band=None, label_raw='Raw FLOPs'
+    )
+    ax2.set_ylabel('FLOPs-per-Token', color='tab:red')
+    ax2.tick_params(axis='y', labelcolor='tab:red')
+
+    lines1, labs1 = ax1.get_legend_handles_labels()
+    lines2, labs2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1+lines2, labs1+labs2, loc='best')
+
+    plt.title('Energy & FLOPs-per-Token vs Precision')
+    plt.tight_layout()
     plt.show()
 
 
 # ---------------------------
-# Plot for Decoder Temperature (Grouping by Method and Config Mode)
+# Plot: Decoder Temperature by Method
 # ---------------------------
 def plot_decoder_temperature(dfs):
-    """
-    Plots Energy- and FLOPs-per-Token vs Decoder Temperature (from dfs['decoding']).
-    Groups the data by decoding method ('greedy', 'top_k', 'top_p') and their config parameters.
-    """
-    if 'decoding' not in dfs:
+    df = dfs.get('decoding')
+    if df is None:
         print("decoding DataFrame not found in dfs.")
         return
+    df = df[df['decoder_config_decoding_mode'].notna()]
+    df = df[df['decoder_config_decoding_mode'].isin(['greedy','top_k','top_p'])]
+    df['method'] = df['decoder_config_decoding_mode']
+    df['temperature'] = df['decoder_temperature']
 
-    decoder_df = dfs['decoding'].copy()
-    decoder_df = decoder_df[decoder_df['decoder_config_decoding_mode'].notna()].copy()
-    decoder_df['method'] = decoder_df['decoder_config_decoding_mode']
-    decoder_df['temperature'] = decoder_df['decoder_temperature']
-
-    def get_config_mode(row):
-        if row['method'] == 'top_k':
-            return row['decoder_top_k']
-        elif row['method'] == 'top_p':
-            return row['decoder_top_p']
-        else:
-            return 'greedy'
-
-    decoder_df['config_mode'] = decoder_df.apply(get_config_mode, axis=1)
-    decoder_df = decoder_df[decoder_df['method'].isin(['greedy', 'top_k', 'top_p'])].copy()
-    groups = decoder_df.groupby(['method', 'config_mode'])
-
-    colors = {'greedy': 'blue', 'top_k': 'green', 'top_p': 'red'}
-
-    fig, ax1 = plt.subplots(figsize=(14, 8))
+    colors = {'greedy':'tab:blue','top_k':'tab:green','top_p':'tab:red'}
+    fig, ax1 = plt.subplots(figsize=(14,8))
     ax2 = ax1.twinx()
 
-    for (method, config_mode), subdf in groups:
-        label_str = f"{method} ({config_mode})"
-        ax1.plot(subdf['temperature'], subdf['energy_per_token_kwh'],
-                 marker='o', linestyle='-', label="_no_legend", color=colors.get(method, 'black'))
-        ax1.set_ylim(bottom=0)
-        ax2.plot(subdf['temperature'], subdf['flops_per_token'],
-                 marker='s', linestyle='--', label=label_str, color=colors.get(method, 'black'))
+    for method, sub in df.groupby('method'):
+        color = colors[method]
+        # raw scatter
+        ax1.scatter(sub['temperature'], sub['energy_per_token_kwh'], color=color, alpha=0.3,
+                    marker='o', label=f"Raw energy ({method})")
+        ax2.scatter(sub['temperature'], sub['flops_per_token'], color=color, alpha=0.3,
+                    marker='s', label=None)
+        # stats
+        stats = sub.groupby('temperature').agg(
+            energy_mean=('energy_per_token_kwh','mean'),
+            energy_std =('energy_per_token_kwh','std'),
+            flops_mean =('flops_per_token','mean'),
+            flops_std  =('flops_per_token','std'),
+        )
+        # band & mean
+        _plot_with_band(ax1, sub, 'temperature','energy_per_token_kwh',
+                        stats,'energy_mean','energy_std',
+                        color, raw_kwargs={'alpha':0.0},
+                        label_mean=f"Mean energy ({method})",
+                        label_band="±1 std",
+                        label_raw=None)
+        _plot_with_band(ax2, sub, 'temperature','flops_per_token',
+                        stats,'flops_mean','flops_std',
+                        color, raw_kwargs={'alpha':0.0,'marker':'s'},
+                        label_mean=f"Mean FLOPs ({method})",
+                        label_band=None,
+                        label_raw=None)
 
     ax1.set_xlabel('Decoder Temperature')
-    ax1.set_ylabel('Energy-per-Token (kWh)', color='blue')
-    ax1.tick_params(axis='y', labelcolor='blue')
-    ax2.set_ylabel('FLOPs-per-Token', color='red')
-    ax2.tick_params(axis='y', labelcolor='red')
-    ax1.set_title('Energy- and FLOPs-per-Token vs Decoder Temperature')
-    ax1.grid(True)
+    ax1.set_ylabel('Energy-per-Token (kWh)', color='tab:blue')
+    ax1.tick_params(axis='y', labelcolor='tab:blue')
+    ax2.set_ylabel('FLOPs-per-Token', color='tab:red')
+    ax2.tick_params(axis='y', labelcolor='tab:red')
 
-    lines1, labels1 = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2, loc='lower right')
+    lines1, labs1 = ax1.get_legend_handles_labels()
+    lines2, labs2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1+lines2, labs1+labs2, loc='best')
 
-    fig.tight_layout()
+    plt.title('Energy & FLOPs-per-Token vs Decoder Temperature')
+    plt.tight_layout()
     plt.show()
 
 
-# ---------------------------
-# Plot for Decoder top_k and top_p
-# ---------------------------
 def plot_decoder_topk_top_p(dfs):
     """
-    Creates two side-by-side subplots for Energy-per-Token vs Top-k and Top-p values
-    using the 'decoding' DataFrame. Colors are determined by decoder temperature.
+    Creates two side‑by‑side subplots for raw + mean±std Energy-per-Token vs Top-k and Top-p.
+    Colours each series by decoder temperature, with smooth error bands.
     """
     if 'decoding' not in dfs:
         print("decoding DataFrame not found in dfs.")
         return
 
-    decoder_df = dfs['decoding'].copy()
-    # Separate data for top_k and top_p.
-    top_k_df = decoder_df[decoder_df['decoder_config_decoding_mode'] == 'top_k'].copy()
-    top_p_df = decoder_df[decoder_df['decoder_config_decoding_mode'] == 'top_p'].copy()
+    df = dfs['decoding'].copy()
+    df = df[df['decoder_config_decoding_mode'].isin(['top_k','top_p'])]
+    df['temp'] = df['decoder_temperature']
 
-    unique_temps_top_k = sorted(top_k_df['decoder_temperature'].unique())
-    unique_temps_top_p = sorted(top_p_df['decoder_temperature'].unique())
+    # Split out top_k vs top_p runs
+    top_k_df = df[df['decoder_config_decoding_mode']=='top_k']
+    top_p_df = df[df['decoder_config_decoding_mode']=='top_p']
 
-    colormap = plt.cm.viridis
-    colors_top_k = {temp: colormap(i/len(unique_temps_top_k)) for i, temp in enumerate(unique_temps_top_k)}
-    colors_top_p = {temp: colormap(i/len(unique_temps_top_p)) for i, temp in enumerate(unique_temps_top_p)}
+    # Define colour map per unique temperature
+    cmap   = plt.cm.viridis
+    temps_k = sorted(top_k_df['temp'].unique())
+    temps_p = sorted(top_p_df['temp'].unique())
+    colors_k = {t: cmap(i/len(temps_k)) for i,t in enumerate(temps_k)}
+    colors_p = {t: cmap(i/len(temps_p)) for i,t in enumerate(temps_p)}
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    fig, (ax_k, ax_p) = plt.subplots(1, 2, figsize=(14,6))
 
-    # Plot for Top-k.
-    for temp in unique_temps_top_k:
-        subdf = top_k_df[top_k_df['decoder_temperature'] == temp]
-        axes[0].plot(subdf['decoder_top_k'],
-                     subdf['energy_per_token_kwh'],
-                     marker='o', linestyle='-', label=f"Temp {temp}",
-                     color=colors_top_k[temp])
-    axes[0].set_xlabel('Top-k Value')
-    axes[0].set_ylabel('Energy-per-Token (kWh)')
-    axes[0].set_title('Energy-per-Token vs Top-k Value')
-    axes[0].grid(True)
-    handles, labels = axes[0].get_legend_handles_labels()
-    axes[0].legend(handles[::-1], labels[::-1], title="Decoder Temperature", loc='best')
+    # --- Top‑k subplot ---
+    for t in temps_k:
+        sub = top_k_df[top_k_df['temp']==t]
+        # 1) raw scatter
+        ax_k.scatter(
+            sub['decoder_top_k'], sub['energy_per_token_kwh'],
+            color=colors_k[t], alpha=0.3, marker='o', s=40,
+            label=f"Raw, Temp {t}"
+        )
+        # 2) compute stats
+        stats = sub.groupby('decoder_top_k').agg(
+            energy_mean=('energy_per_token_kwh','mean'),
+            energy_std =('energy_per_token_kwh','std')
+        )
+        # 3) smooth band + mean
+        _plot_with_band(
+            ax_k, sub, 'decoder_top_k', 'energy_per_token_kwh',
+            stats, 'energy_mean', 'energy_std',
+            color=colors_k[t],
+            raw_kwargs={'alpha':0.0},
+            label_mean=f"Mean, Temp {t}",
+            label_band="±1 std",
+            label_raw=None
+        )
+    ax_k.set_xlabel("Top‑k Value")
+    ax_k.set_ylabel("Energy‑per‑Token (kWh)")
+    ax_k.set_title("Energy‑per‑Token vs Top‑k")
+    ax_k.grid(True)
 
-    # Plot for Top-p.
-    for temp in unique_temps_top_p:
-        subdf = top_p_df[top_p_df['decoder_temperature'] == temp]
-        axes[1].plot(subdf['decoder_top_p'],
-                     subdf['energy_per_token_kwh'],
-                     marker='o', linestyle='-', label=f"Temp {temp}",
-                     color=colors_top_p[temp])
-    axes[1].set_xlabel('Top-p Value')
-    axes[1].set_ylabel('Energy-per-Token (kWh)')
-    axes[1].set_title('Energy-per-Token vs Top-p Value')
-    axes[1].grid(True)
-    handles, labels = axes[1].get_legend_handles_labels()
-    axes[1].legend(handles[::-1], labels[::-1], title="Decoder Temperature", loc='best')
+    # --- Top‑p subplot ---
+    for t in temps_p:
+        sub = top_p_df[top_p_df['temp']==t]
+        ax_p.scatter(
+            sub['decoder_top_p'], sub['energy_per_token_kwh'],
+            color=colors_p[t], alpha=0.3, marker='o', s=40,
+            label=f"Raw, Temp {t}"
+        )
+        stats = sub.groupby('decoder_top_p').agg(
+            energy_mean=('energy_per_token_kwh','mean'),
+            energy_std =('energy_per_token_kwh','std')
+        )
+        _plot_with_band(
+            ax_p, sub, 'decoder_top_p', 'energy_per_token_kwh',
+            stats, 'energy_mean', 'energy_std',
+            color=colors_p[t],
+            raw_kwargs={'alpha':0.0},
+            label_mean=f"Mean, Temp {t}",
+            label_band="±1 std",
+            label_raw=None
+        )
+    ax_p.set_xlabel("Top‑p Value")
+    ax_p.set_ylabel("Energy‑per‑Token (kWh)")
+    ax_p.set_title("Energy‑per‑Token vs Top‑p")
+    ax_p.grid(True)
 
-    fig.tight_layout()
+    # Combine legends
+    lines_k, labs_k = ax_k.get_legend_handles_labels()
+    lines_p, labs_p = ax_p.get_legend_handles_labels()
+    ax_k.legend(lines_k + lines_p, labs_k + labs_p, loc='best', title="Decoder Temp")
+
+    plt.tight_layout()
     plt.show()
 
 
-# ---------------------------
-# Plot for Latency (Fixed Order using Categories)
-# ---------------------------
+
 def plot_latency(dfs):
-    """
-    Plots Energy- and FLOPs-per-Token vs Latency Config using a fixed category order.
-    """
+
     if 'latency' not in dfs:
         print("latency DataFrame not found in dfs.")
         return
 
-    latency_df = dfs['latency'].copy()
+    df = dfs['latency'].copy()
 
-    def determine_latency_label(row):
-        if not row.get('latency_simulation_simulate', False):
-            return "No\nsimulation"
-        else:
-            delay_min = row.get('latency_simulation_delay_min', None)
-            delay_max = row.get('latency_simulation_delay_max', None)
-            simulate_burst = row.get('latency_simulation_simulate_burst', False)
-            if not simulate_burst:
-                return f"Sim\n({delay_min}-{delay_max})"
-            else:
-                burst_size = row.get('latency_simulation_burst_size', None)
-                burst_interval = row.get('latency_simulation_burst_interval', None)
-                return f"Sim ({delay_min}-{delay_max})\nBurst ({burst_size},{burst_interval})"
-
-    latency_df["latency_label"] = latency_df.apply(determine_latency_label, axis=1).astype(str)
-    latency_order = [
-        "No\nsimulation",
-        "Sim\n(0.05-0.2)",
-        "Sim\n(0.2-0.6)",
-        "Sim (0.05-0.2)\nBurst (5,4.0)",
-        "Sim (0.2-0.6)\nBurst (8,5.0)"
-    ]
-    latency_df['latency_label'] = pd.Categorical(latency_df['latency_label'],
-                                                  categories=latency_order, ordered=True)
-    latency_df = latency_df.sort_values('latency_label')
-
-    fig, ax1 = plt.subplots(figsize=(8, 6))
-    color_energy = 'tab:blue'
-    ax1.set_xlabel('Latency Config')
-    ax1.set_ylabel('Energy per Token (kWh)', color=color_energy)
-    ax1.plot(latency_df['latency_label'].astype(str), latency_df['energy_per_token_kwh'],
-             marker='o', linestyle='-', color=color_energy, label='Energy per Token (kWh)')
-    ax1.tick_params(axis='y', labelcolor=color_energy)
-    ax1.grid(True)
-
-    ax2 = ax1.twinx()
-    color_flops = 'tab:red'
-    ax2.set_ylabel('FLOPs per Token', color=color_flops)
-    ax2.plot(latency_df['latency_label'].astype(str), latency_df['flops_per_token'],
-             marker='s', linestyle='--', color=color_flops, label='FLOPs per Token')
-    ax2.tick_params(axis='y', labelcolor=color_flops)
-
-    lines1, labels1 = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2, loc='best')
-
-    plt.title('Energy- and FLOPs-per-Token vs Latency Config')
-    fig.tight_layout()
-    plt.setp(ax1.get_xticklabels(), rotation=45, ha='right')
-    plt.show()
-
-
-# ---------------------------
-# Plot for Latency (Dynamic x-axis using Numeric Scale)
-# ---------------------------
-def plot_latency_dynamic(dfs):
-    """
-    Plots Energy- and FLOPs-per-Token vs Latency on a dynamic numeric x-axis.
-    For simulated rows, the x-axis value is the mean of delay_min and delay_max;
-    non-simulation rows are placed at 0. Distinct burstiness classes are plotted as separate lines.
-    """
-    if 'latency' not in dfs:
-        print("latency DataFrame not found in dfs.")
-        return
-
-    latency_df = dfs['latency'].copy()
-
-    def compute_latency_category(row):
-        if not row.get('latency_simulation_simulate', False):
-            return "No simulation"
-        else:
-            delay_min = row.get('latency_simulation_delay_min', None)
-            delay_max = row.get('latency_simulation_delay_max', None)
-            return f"Sim ({delay_min}-{delay_max})"
-
-    latency_df['latency_category'] = latency_df.apply(compute_latency_category, axis=1)
-
-    def compute_burstiness(row):
-        if not row.get('latency_simulation_simulate', False):
-            return "Baseline"
-        else:
-            if not row.get('latency_simulation_simulate_burst', False):
-                return "Non-burst"
-            else:
-                burst_size = row.get('latency_simulation_burst_size', None)
-                burst_interval = row.get('latency_simulation_burst_interval', None)
-                return f"Burst ({burst_size},{burst_interval})"
-
-    latency_df['burstiness'] = latency_df.apply(compute_burstiness, axis=1)
-    latency_df['latency_category'] = latency_df['latency_category'].astype(str)
-    latency_df['burstiness'] = latency_df['burstiness'].astype(str)
-
-    non_sim = "No simulation"
-    sim_cats = sorted(latency_df.loc[latency_df['latency_simulation_simulate'] == True, 'latency_category'].unique())
-    full_order = [non_sim] + sim_cats
-    latency_df['latency_category'] = pd.Categorical(latency_df['latency_category'],
-                                                     categories=full_order, ordered=True)
-
-    def compute_latency_numeric(row):
-        if not row.get('latency_simulation_simulate', False):
-            return 0.0
-        else:
-            try:
-                min_val = float(row.get('latency_simulation_delay_min', 0))
-                max_val = float(row.get('latency_simulation_delay_max', 0))
-                return (min_val + max_val) / 2.0
-            except Exception:
-                return np.nan
-
-    latency_df['latency_numeric'] = latency_df.apply(compute_latency_numeric, axis=1)
-
-    unique_x = latency_df[['latency_numeric', 'latency_category']].drop_duplicates().sort_values('latency_numeric')
-    x_ticks = unique_x['latency_numeric'].values
-    x_labels = unique_x['latency_category'].values
-
-    energy_pivot = latency_df.pivot_table(
-        index='latency_category',
-        columns='burstiness',
-        values='energy_per_token_kwh',
-        aggfunc='mean'
-    )
-    flops_pivot = latency_df.pivot_table(
-        index='latency_category',
-        columns='burstiness',
-        values='flops_per_token',
-        aggfunc='mean'
+    # 1) Numeric latency: 0 for no sim, else mean of min/max
+    df['latency_numeric'] = df.apply(
+        lambda r: 0.0
+                  if not r.get('latency_simulation_simulate', False)
+                  else (float(r['latency_simulation_delay_min']) +
+                        float(r['latency_simulation_delay_max'])) / 2,
+        axis=1
     )
 
-    x_positions = np.arange(len(full_order))
+    # 2) Base boolean flags (bursty=T, constant=F)
+    bursty   = df['latency_simulation_simulate_burst'].fillna(False)
+    constant = ~bursty
 
+    # “No sim” rows belong to both classes
+    no_sim = ~df['latency_simulation_simulate'].fillna(False)
+    df['latency_bursty']   = bursty   | no_sim
+    df['latency_constant'] = constant | no_sim
+
+    # Print counts:
+    print("Observations per class:")
+    print(f"  No simulation total:     {no_sim.sum()}")
+    print(f"  In Latency (constant):   {constant.sum()}")
+    print(f"  In Latency (bursty):     {bursty.sum()}")
+
+    # Plotting
     fig, ax1 = plt.subplots(figsize=(10, 6))
     ax2 = ax1.twinx()
+    ax1.set_xlabel("Mean Latency (ms)")
+    ax1.set_ylabel("Energy-per-Token (kWh)")
+    ax2.set_ylabel("FLOPs-per-Token")
 
-    for burst_cat in energy_pivot.columns:
-        y_energy = energy_pivot[burst_cat].reindex(full_order)
-        ax1.plot(x_positions, y_energy, marker='o', linestyle='-', label=f"Energy: {burst_cat}")
-    for burst_cat in flops_pivot.columns:
-        y_flops = flops_pivot[burst_cat].reindex(full_order)
-        ax2.plot(x_positions, y_flops, marker='s', linestyle='--', label=f"FLOPs: {burst_cat}")
+    colors = {
+        'Latency (constant)': 'tab:blue',
+        'Latency (bursty)'   : 'tab:red'
+    }
+    
+    # Energy curves per class (allowing overlap)
+    mask_dict = {
+        'Latency (constant)': df['latency_constant'],
+        'Latency (bursty)' : df['latency_bursty']
+    }
+    
+    # Build burst‐range categories:
+    burst_ranges = (
+        df[df['latency_simulation_simulate_burst']]
+        [['latency_simulation_delay_min','latency_simulation_delay_max']]
+        .drop_duplicates()
+        .apply(tuple, axis=1)
+        .tolist()
+    )
+    
+    # 4) Create a categorical column “burst_range” that matches each row
+    df['burst_range'] = list(zip(df['latency_simulation_delay_min'],
+                                 df['latency_simulation_delay_max']))
+    #    Anything outside your four defined ranges gets labeled “other”
+    df['burst_range'] = df['burst_range'].where(
+        df['burst_range'].isin(burst_ranges),
+        other='other'
+    )
 
-    ax1.set_xticks(x_positions)
-    ax1.set_xticklabels(full_order, rotation=45, ha='right')
-    ax1.set_xlabel("Latency Config")
-    ax1.set_ylabel("Energy per Token (kWh)", color='tab:blue')
-    ax2.set_ylabel("FLOPs per Token", color='tab:red')
+    # 5) Choose a blue colormap ramp:
+    cmap = cm.get_cmap('Blues', n_ranges + 1)  # +1 so “other” can be very light
+    # Map each range → a color
+    colors = {rng: cmap(i)
+              for i, rng in enumerate(burst_ranges)}
+    colors['other'] = cmap(0.2)  # pale blue for anything else
+    
+    for cls_name, mask in mask_dict.items():
+        sub_df = df[mask]
+        
+        c = colors[cls_name]
+        
+        ax1.scatter(sub_df['latency_numeric'],
+                    sub_df['energy_per_token_kwh'],
+                    color=c, alpha=0.3, label=f"Raw energy ({cls})")
 
-    lines1, labels1 = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2, loc="best")
+        stats = (sub_df.groupby('latency_numeric')
+                    .energy_per_token_kwh
+                    .agg(['mean','std'])
+                    .rename(columns={'mean':'m','std':'s'}))
+        
+        # Patch in 0.0 manually if needed
+        if 0.0 not in stats.index and not sub_df[sub_df['latency_numeric']==0].empty:
+            z = sub_df[sub_df['latency_numeric']==0].energy_per_token_kwh
+            stats.loc[0.0] = [z.mean(), z.std()]
+        stats = stats.sort_index()
 
-    plt.title("Energy- and FLOPs-per-Token vs Latency Config (Dynamic)")
-    fig.tight_layout()
+        _plot_with_band(
+            ax1, sub_df, 'latency_numeric', 'energy_per_token_kwh',
+            stats, 'm', 's', c,
+            raw_kwargs={'alpha':0},
+            label_mean=f"Mean energy ({cls})",
+            label_band="±1 std"
+        )
+
+    # FLOPs curve (across all)
+    fl = (df.groupby('latency_numeric')
+            .flops_per_token
+            .agg(['mean','std'])
+            .rename(columns={'mean':'m','std':'s'}))
+    fl = fl.sort_index()
+    _plot_with_band(
+        ax2, df, 'latency_numeric', 'flops_per_token',
+        fl, 'm', 's', 'tab:purple',
+        raw_kwargs={'alpha':0,'marker':'s'},
+        label_mean="FLOPs (all latencies)"
+    )
+
+    # Tidy up axes, legend, title
+    ax1.set_xlim(df['latency_numeric'].min(),
+                 df['latency_numeric'].max())
+    ax1.legend(loc='best')
+    ax1.set_title("Energy & FLOPs-per-Token vs Latency (Dynamic)")
+    plt.tight_layout()
     plt.show()
-
 
 # ---------------------------
 # Function to Plot All Figures
@@ -463,8 +508,6 @@ def plot_all_vizs(dfs):
     plot_decoder_temperature(dfs)
     plot_decoder_topk_top_p(dfs)
     plot_latency(dfs)
-    plot_latency_dynamic(dfs)
-
 
 # ---------------------------
 # Main Section 
