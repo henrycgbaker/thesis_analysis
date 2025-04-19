@@ -510,15 +510,3 @@ def plot_all_vizs(dfs):
     plot_latency(dfs)
 
 # ---------------------------
-# Main Section 
-# ---------------------------
-if __name__ == "__main__":
-    
-    from scripts.a_data_loading_cleaning import run_load_clean_diagnose_data
-    csv_path = "results/controlled_results.csv"
-    df = run_load_clean_diagnose_data(csv_path)
-    
-    # Then create the dfs dictionary as follows:
-    configs = ['num_processes', 'batching', 'precis', 'decoding', 'latency']
-    dfs = {config: df[df['config_name'].str.startswith(config)] for config in configs}
-    

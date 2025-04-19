@@ -171,7 +171,7 @@ def plot_precision(dfs):
 # ---------------------------
 
 # 1) non-zero axis
-def plot_decoder_temperature_auto_axis(dfs):
+def plot_decoder_temperature_auto_a(dfs):
     """
     Plots Energy- and FLOPs-per-Token vs Decoder Temperature (from dfs['decoding']).
     Groups the data by decoding method ('greedy', 'top_k', 'top_p') and their config parameters.

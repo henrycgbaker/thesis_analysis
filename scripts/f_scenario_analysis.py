@@ -59,6 +59,9 @@ def compare_energy_to_appliances(
             e_min = subset['energy_per_token_kwh'].min() * avg_len_tokens
             e_mean = subset['energy_per_token_kwh'].mean() * avg_len_tokens
             diff = e_max - e_min
+            ratio = e_max / e_min
+            
+            print(f"\n Overall ratio (max / min): {ratio} \n")
 
             # Group by appliance
             print("# of responses to match...")
