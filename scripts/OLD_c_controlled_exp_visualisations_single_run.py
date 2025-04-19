@@ -33,7 +33,7 @@ import warnings
 # ---------------------------
 def plot_num_processes(dfs):
     """
-    Plots Energy- and FLOPs-per-Token vs Number of Processes (from dfs['num_processes']).
+    Plots relative Energy‑ and FLOPs‑per‑Token vs Number of Processes.
     """
     if 'num_processes' not in dfs:
         print("num_processes DataFrame not found in dfs.")
@@ -42,28 +42,63 @@ def plot_num_processes(dfs):
     num_proc_df = dfs['num_processes'].copy()
     num_proc_df['num_processes'] = num_proc_df['num_processes'].astype(int)
 
+    # --- Normalize both series to their first entry ---
+    num_proc_df['energy_rel'] = (
+        num_proc_df['energy_per_token_kwh'] /
+        num_proc_df['energy_per_token_kwh'].iloc[0]
+    )
+    num_proc_df['flops_rel'] = (
+        num_proc_df['flops_per_token'] /
+        num_proc_df['flops_per_token'].iloc[0]
+    )
+
     fig, ax1 = plt.subplots(figsize=(8, 6))
-    color_energy = 'tab:blue'
+
+    # 1) integer x‐axis
+    ax1.xaxis.set_major_locator(MaxNLocator(integer=True))
     ax1.set_xlabel('Number of Processes')
-    ax1.set_ylabel('Energy-per-Token (kWh)', color=color_energy)
-    ax1.plot(num_proc_df['num_processes'], num_proc_df['energy_per_token_kwh'],
-             marker='o', linestyle='-', color=color_energy, label='Energy-per-Token (kWh)')
-    ax1.set_ylim(bottom=0)
+
+    # Energy line
+    color_energy = 'tab:blue'
+    energy_line, = ax1.plot(
+        num_proc_df['num_processes'],
+        num_proc_df['energy_rel'],
+        linestyle='-',
+        marker='o',
+        color=color_energy,
+        label='Energy‑per‑Token (relative)'
+    )
+    ax1.set_ylabel('Relative Energy‑per‑Token', color=color_energy)
     ax1.tick_params(axis='y', labelcolor=color_energy)
-    ax1.set_xticks(sorted(num_proc_df['num_processes'].unique()))
+    ax1.set_ylim(bottom=0)
+
+    # (If you had any ax1.scatter or std‐bands here, just add label='_nolegend_' to them,
+    # so they don’t appear in the legend.)
 
     ax2 = ax1.twinx()
+
+    # FLOPs line
     color_flops = 'tab:red'
-    ax2.set_ylabel('FLOPs-per-Token', color=color_flops)
-    ax2.plot(num_proc_df['num_processes'], num_proc_df['flops_per_token'],
-             marker='s', linestyle='--', color=color_flops, label='FLOPs-per-Token')
+    flops_line, = ax2.plot(
+        num_proc_df['num_processes'],
+        num_proc_df['flops_rel'],
+        linestyle='--',
+        marker='s',
+        color=color_flops,
+        label='FLOPs‑per‑Token (relative)'
+    )
+    ax2.set_ylabel('Relative FLOPs‑per‑Token', color=color_flops)
     ax2.tick_params(axis='y', labelcolor=color_flops)
+    ax2.set_ylim(bottom=0)
 
-    lines1, labels1 = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2, loc='best')
+    # 2) legend: only the two line plots
+    ax1.legend(
+        [energy_line, flops_line],
+        ['Energy‑per‑Token', 'FLOPs‑per‑Token'],
+        loc='best'
+    )
 
-    plt.title('Energy- & FLOPs-per-Token vs Number of Processes')
+    plt.title('Relative Energy‑ & FLOPs‑per‑Token vs Number of Processes')
     fig.tight_layout()
     plt.show()
 

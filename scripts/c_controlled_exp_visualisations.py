@@ -1,11 +1,13 @@
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 import pandas as pd
 import numpy as np
 
-
 def _plot_with_band(ax, raw_df, x_col, y_col, mean_df, mean_col, std_col,
                     color, raw_kwargs=None, band_alpha=0.2,
-                    label_mean="Mean", label_band="±1 std", label_raw="Raw"):
+                    normalise_axes=None,
+                    plot_mean=True, plot_band=True, plot_raw=True,
+                    label_mean=None, label_band=None, label_raw=None):
     """
     Plot raw scatter and a smoothed mean ± std band on ax.
     Maps categorical x to numeric positions if needed.
@@ -24,18 +26,35 @@ def _plot_with_band(ax, raw_df, x_col, y_col, mean_df, mean_col, std_col,
     mapping = {str(v): p for v, p in zip(idx_str, positions)}
     raw_x = raw_df[x_col].astype(str).map(mapping)
 
-    # Scatter raw points
-    if label_raw:
-        ax.scatter(raw_x, raw_df[y_col],
-                   color=color, alpha=raw_kwargs.get('alpha',0.3),
-                   marker=raw_kwargs.get('marker','o'),
-                   label=label_raw)
-
-    # Compute mean and std arrays
+    # ─── Compute mean/std (and baseline) up front ───
     mean_vals = mean_df[mean_col].values
-    std_vals = mean_df[std_col].fillna(0).values
-    lower = mean_vals - std_vals
-    upper = mean_vals + std_vals
+    std_vals  = mean_df[std_col].fillna(0).values
+    lower     = mean_vals - std_vals
+    upper     = mean_vals + std_vals
+
+    # default to no normalisation
+    baseline = None
+
+    # if the user passed a list of Axes and this ax is in it, normalise:
+    if normalise_axes and ax in normalise_axes:
+        baseline     = mean_vals[0]
+        mean_vals   /= baseline
+        std_vals    /= baseline
+        lower        = mean_vals - std_vals
+        upper        = mean_vals + std_vals
+
+    # 1) Scatter raw points (after baseline is set)
+    if plot_raw:
+        raw_y = raw_df[y_col] if baseline is None else raw_df[y_col] / baseline
+        if label_raw:
+            ax.scatter(raw_x, raw_y,
+                       color=color, alpha=raw_kwargs.get('alpha',0.3),
+                       marker=raw_kwargs.get('marker','o'),
+                       label=label_raw)
+        else:
+            ax.scatter(raw_x, raw_y,
+                       color=color, alpha=raw_kwargs.get('alpha',0.3),
+                       marker=raw_kwargs.get('marker','o'))
 
     if len(positions) > 1:
         # Smooth interpolation
@@ -43,19 +62,38 @@ def _plot_with_band(ax, raw_df, x_col, y_col, mean_df, mean_col, std_col,
         mean_fine = np.interp(x_fine, positions, mean_vals)
         low_fine = np.interp(x_fine, positions, lower)
         up_fine = np.interp(x_fine, positions, upper)
-        # Plot mean line
-        ax.plot(x_fine, mean_fine, linestyle='-', color=color, label=label_mean)
-        # Plot band
-        if label_band:
-            ax.fill_between(x_fine, low_fine, up_fine, color=color, alpha=band_alpha, label=label_band)
+        
+        # 2) Plot mean line
+        if plot_mean:
+            if label_mean:
+                ax.plot(x_fine, mean_fine, linestyle='-', color=color, label=label_mean)
+            else:
+                ax.plot(x_fine, mean_fine, linestyle='-', color=color)
+
+        # 3) Plot band
+        if plot_band:
+            if label_band:
+                ax.fill_between(x_fine, low_fine, up_fine, color=color,
+                                alpha=band_alpha, label=label_band)
+            else:
+                ax.fill_between(x_fine, low_fine, up_fine, color=color, alpha=band_alpha)
+
     else:
         # Single point
-        ax.plot(positions, mean_vals,
-                marker=raw_kwargs.get('marker','o'), linestyle='-', color=color,
-                label=label_mean)
-        if label_band:
-            ax.fill_between(positions, lower, upper, color=color, alpha=band_alpha, label=label_band)
-
+        if plot_mean:
+            if label_mean:
+                ax.plot(positions, mean_vals,
+                        marker=raw_kwargs.get('marker','o'), linestyle='-', color=color,
+                        label=label_mean)
+            else:
+                ax.plot(positions, mean_vals,
+                        marker=raw_kwargs.get('marker','o'), linestyle='-', color=color)
+        if plot_band:
+            if label_band:
+                ax.fill_between(positions, lower, upper, color=color,
+                                alpha=band_alpha, label=label_band)
+            else:
+                ax.fill_between(positions, lower, upper, color=color, alpha=band_alpha)
 
 # ---------------------------
 # Plot: Number of Processes
@@ -86,8 +124,11 @@ def plot_num_processes(dfs):
         energy_stats, 'energy_mean','energy_std',
         color='tab:blue',
         raw_kwargs={'alpha':0.3,'marker':'o'},
-        label_mean='Mean energy', label_band='±1 std', label_raw='Raw energy'
+        normalise_axes=[ax1],
+        plot_mean=True, plot_band=True, plot_raw=True,
+        label_mean='Mean energy', label_band=None, label_raw=None
     )
+    ax1.xaxis.set_major_locator(MaxNLocator(integer=True))
     ax1.set_xlabel('Number of Processes')
     ax1.set_ylabel('Energy-per-Token (kWh)', color='tab:blue')
     ax1.tick_params(axis='y', labelcolor='tab:blue')
@@ -98,7 +139,8 @@ def plot_num_processes(dfs):
         flops_stats, 'flops_mean','flops_std',
         color='tab:red',
         raw_kwargs={'alpha':0.3,'marker':'s'},
-        label_mean='Mean FLOPs', label_band=None, label_raw='Raw FLOPs'
+        plot_mean=True, plot_band=True, plot_raw=True,
+        label_mean='Mean FLOPs', label_band=None, label_raw=None
     )
     ax2.set_ylabel('FLOPs-per-Token', color='tab:red')
     ax2.tick_params(axis='y', labelcolor='tab:red')
@@ -110,7 +152,6 @@ def plot_num_processes(dfs):
     plt.title('Energy & FLOPs-per-Token vs Number of Processes')
     plt.tight_layout()
     plt.show()
-
 
 # ---------------------------
 # Plot: Batching

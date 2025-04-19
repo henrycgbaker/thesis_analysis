@@ -49,7 +49,7 @@ def plot_scatter(data, x_column='flops_per_token', y_column='energy_per_token_kw
 # ---------------------------
 # 4. Scatter: Divergence vs. Batch Size
 # ---------------------------
-def plot_divergence(data, x_column='batch_size___fixed_batching', y_column='divergence_energy_flops'):
+def plot_divergence(data, x_column='energy_per_token_kwh', y_column='divergence_energy_flops'):
     if x_column not in data or y_column not in data:
         print(f"Columns '{x_column}' or '{y_column}' not found in DataFrame.")
         return
@@ -118,6 +118,6 @@ if __name__ == "__main__":
     plot_histogram(df, 'energy_per_token_kwh')
     plot_boxplot(df, 'energy_per_token_kwh')
     plot_scatter(df, 'flops_per_token', 'energy_per_token_kwh')
-    plot_divergence(df, 'batch_size___fixed_batching', 'divergence_energy_flops')
+    plot_divergence(df, 'energy_per_token_kwh', 'divergence_energy_flops')
     columns_to_correlate = ['energy_per_token_kwh', 'flops_per_token', 'divergence_energy_flops']
     plot_correlation_matrix(df, columns_to_correlate)
