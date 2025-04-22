@@ -735,29 +735,41 @@ def plot_all_vizs(dfs):
     Calls all individual plotting functions.
     """
     # # of proc
-    plot_num_processes(dfs)
+    #plot_num_processes(dfs)
     plot_num_processes(dfs, normalise_axes=['ax1'])
+    
     # batch size
-    plot_batching(dfs)
+    #plot_batching(dfs)
     plot_batching(dfs, normalise_axes=['ax1'])
+    
     # precision
-    plot_precision(dfs)
+    #plot_precision(dfs)
     plot_precision(dfs, normalise_axes=['ax1'])
-    # decoder
-    plot_decoder_temperature(dfs)
-    plot_decoder_temperature(dfs, normalise_axes=['ax1'])
-    plot_decoder_temperature(dfs, normalise_axes=['ax1'], plot_band=False, plot_raw=False)
-    plot_decoder_topk_top_p(dfs)
-    plot_decoder_topk_top_p(dfs, normalise_axes=['ax1'])
-    plot_decoder_topk_top_p(dfs, normalise_axes=['ax1'], plot_band=False, plot_raw=False)
+    
+    # decoder 
+    # -temp
+    #plot_decoder_temperature(dfs)
+    #plot_decoder_temperature(dfs, normalise_axes=['ax1'])
+    plot_decoder_temperature(dfs, plot_band=False, plot_raw=False)
+    plot_decoder_temperature(dfs, normalise_axes=['ax1'], plot_band=True, plot_raw=True)
+    
+    # - top p/k
+    #plot_decoder_topk_top_p(dfs)
+    #plot_decoder_topk_top_p(dfs, normalise_axes=['ax1'])
+    plot_decoder_topk_top_p(dfs, plot_band=False, plot_raw=False)
+    plot_decoder_topk_top_p(dfs, normalise_axes=['ax1'], plot_band=True, plot_raw=True)
+    
     # latency 
     # - burst size
-    plot_latency_by_burst_size(dfs)
-    plot_latency_by_burst_size(dfs, normalise_axes=['ax1'])
-    plot_latency_by_burst_size(dfs, normalise_axes=['ax1'], plot_band=False, plot_raw=False)
+    #plot_latency_by_burst_size(dfs)
+    #plot_latency_by_burst_size(dfs, normalise_axes=['ax1'])
+    plot_latency_by_burst_size(dfs, plot_band=False, plot_raw=False)
+    plot_latency_by_burst_size(dfs, normalise_axes=['ax1'], plot_band=True, plot_raw=True)
+    
     # - burst interval
-    plot_latency_by_burst_interval(dfs)
-    plot_latency_by_burst_interval(dfs, normalise_axes=['ax1'])
-    plot_latency_by_burst_interval(dfs, normalise_axes=['ax1'], plot_band=False, plot_raw=False)
+    #plot_latency_by_burst_interval(dfs)
+    #plot_latency_by_burst_interval(dfs, normalise_axes=['ax1'])
+    plot_latency_by_burst_interval(dfs, plot_band=False, plot_raw=False)
+    plot_latency_by_burst_interval(dfs, normalise_axes=['ax1'], plot_band=True, plot_raw=True)
 
 # ---------------------------

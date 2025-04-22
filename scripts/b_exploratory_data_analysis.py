@@ -16,6 +16,23 @@ def plot_histogram(data, column='energy_per_token_kwh', bins=90):
     plt.ylabel('Frequency')
     plt.grid(True)
     plt.show()
+    
+def plot_histogram_zscore(data, column='energy_per_token_kwh', bins=90):
+    if column not in data:
+        print(f"Column '{column}' not found in DataFrame.")
+        return
+
+    vals = data[column].dropna()
+    # z‑score normalisation
+    z = (vals - vals.mean()) / vals.std()
+
+    plt.figure(figsize=(10, 6))
+    plt.hist(z, bins=bins, edgecolor='black')
+    plt.title(f'Histogram of z‑score normalised {column}')
+    plt.xlabel('Energy-per-Token (Z‑score)')
+    plt.ylabel('Frequency')
+    plt.grid(True)
+    plt.show()
 
 # ---------------------------
 # 2. Boxplot
@@ -91,6 +108,9 @@ def plot_all_diagnostics(df):
     """
     print("📊 Plotting histogram...")
     plot_histogram(df)
+    
+    print("📊 Plotting normalised histogram...")
+    plot_histogram_zscore(df, 'energy_per_token_kwh')
 
     print("📦 Plotting boxplot...")
     plot_boxplot(df)
@@ -116,6 +136,7 @@ if __name__ == "__main__":
     df = run_load_clean_diagnose_data(csv_path)
 
     plot_histogram(df, 'energy_per_token_kwh')
+    plot_histogram_zscore(df, 'energy_per_token_kwh')
     plot_boxplot(df, 'energy_per_token_kwh')
     plot_scatter(df, 'flops_per_token', 'energy_per_token_kwh')
     plot_divergence(df, 'energy_per_token_kwh', 'divergence_energy_flops')
