@@ -1,128 +1,194 @@
 import matplotlib.pyplot as plt
-import pandas as pd
+from matplotlib.ticker import MaxNLocator, FuncFormatter
+from matplotlib import cm
 import numpy as np
 
-# ---------------------------
-# 1. Histogram
-# ---------------------------
-def plot_histogram(data, column='energy_per_token_kwh', bins=90):
-    if column not in data:
-        print(f"Column '{column}' not found in DataFrame.")
-        return
-    plt.figure(figsize=(10, 6))
-    plt.hist(data[column].dropna(), bins=bins, edgecolor='black')
-    plt.title(f'Histogram of {column}')
-    plt.xlabel(column)
-    plt.ylabel('Frequency')
-    plt.grid(True)
-    plt.show()
-    
-def plot_histogram_zscore(data, column='energy_per_token_kwh', bins=90):
-    if column not in data:
-        print(f"Column '{column}' not found in DataFrame.")
-        return
+# -----------------------------------------------------------------
+# Helpers for coloring by model
+# -----------------------------------------------------------------
+def assign_model_colors(df):
+    """
+    Create a unique color mapping for each model using a Tab10 colormap.
+    """
+    models = df['model'].unique()
+    cmap = cm.get_cmap('tab10', len(models))
+    return {m: cmap(i) for i, m in enumerate(models)}
 
-    vals = data[column].dropna()
-    # z‑score normalisation
-    z = (vals - vals.mean()) / vals.std()
-
-    plt.figure(figsize=(10, 6))
-    plt.hist(z, bins=bins, edgecolor='black')
-    plt.title(f'Histogram of z‑score normalised {column}')
-    plt.xlabel('Energy-per-Token (Z‑score)')
-    plt.ylabel('Frequency')
-    plt.grid(True)
-    plt.show()
-
-# ---------------------------
-# 2. Boxplot
-# ---------------------------
-def plot_boxplot(data, column='energy_per_token_kwh'):
-    if column not in data:
-        print(f"Column '{column}' not found in DataFrame.")
-        return
-    plt.figure(figsize=(10, 2))
-    plt.boxplot(data[column].dropna(), vert=False)
-    plt.title(f'Boxplot of {column}')
-    plt.xlabel(column)
-    plt.grid(True)
-    plt.show()
-
-# ---------------------------
-# 3. Scatter Plot
-# ---------------------------
-def plot_scatter(data, x_column='flops_per_token', y_column='energy_per_token_kwh'):
-    if x_column not in data or y_column not in data:
-        print(f"Columns '{x_column}' or '{y_column}' not found in DataFrame.")
-        return
-    plt.figure(figsize=(10, 6))
-    plt.scatter(data[x_column], data[y_column], alpha=0.6)
-    plt.title(f'{y_column} vs. {x_column}')
-    plt.xlabel(x_column)
-    plt.ylabel(y_column)
-    plt.grid(True)
-    plt.show()
-
-# ---------------------------
-# 4. Scatter: Divergence vs. Batch Size
-# ---------------------------
-def plot_divergence(data, x_column='energy_per_token_kwh', y_column='divergence_energy_flops'):
-    if x_column not in data or y_column not in data:
-        print(f"Columns '{x_column}' or '{y_column}' not found in DataFrame.")
-        return
-    plt.figure(figsize=(10, 6))
-    plt.scatter(data[x_column], data[y_column], alpha=0.6)
-    plt.title(f'{y_column} vs. {x_column}')
-    plt.xlabel(x_column)
-    plt.ylabel(y_column)
-    plt.grid(True)
-    plt.show()
-
-# ---------------------------
-# 5. Correlation Matrix
-# ---------------------------
-def plot_correlation_matrix(data, columns=None):
-    if columns is None:
-        columns = ['energy_per_token_kwh', 'flops_per_token', 'divergence_energy_flops']
-    
-    missing = [col for col in columns if col not in data]
-    if missing:
-        print(f"Missing columns for correlation matrix: {missing}")
-        return
-    
-    corr = data[columns].corr()
+# -----------------------------------------------------------------
+# Plot: Energy Histogram overlayed by Model
+# -----------------------------------------------------------------
+def plot_energy_histograms(df, bins=90):
+    """
+    Overlay histograms of energy_per_token_kwh for all models on one plot.
+    """
+    colors = assign_model_colors(df)
     plt.figure(figsize=(8, 6))
-    plt.matshow(corr, cmap='coolwarm', fignum=1)
-    plt.xticks(range(len(columns)), columns, rotation=45)
-    plt.yticks(range(len(columns)), columns)
-    plt.colorbar()
-    plt.title('Correlation Matrix', pad=20)
+    for model, subset in df.groupby('model'):
+        plt.hist(subset['energy_per_token_kwh'], bins=bins,
+                 alpha=0.5, label=model, color=colors[model])
+    plt.xlabel('Energy per Token (kWh)')
+    plt.ylabel('Count')
+    plt.title('Histogram of Energy per Token by Model')
+    plt.legend(title='Model')
+    plt.tight_layout()
     plt.show()
 
-# ---------------------------
-# Plot All Diagnostics
-# ---------------------------
+# -----------------------------------------------------------------
+# Plot: Boxplot of Energy per Token overlayed by Model
+# -----------------------------------------------------------------
+def plot_energy_boxplots(df, column='energy_per_token_kwh'):
+    """
+    Overlay horizontal boxplots of the specified column for all models on one plot.
+    """
+    if column not in df:
+        print(f"Column '{column}' not found in DataFrame.")
+        return
+    colors = assign_model_colors(df)
+    models = list(df['model'].unique())
+    data = [df[df['model'] == m][column].dropna() for m in models]
+    fig, ax = plt.subplots(figsize=(10, 2 + len(models)*0.3))
+    box = ax.boxplot(data, vert=False, patch_artist=True, labels=models)
+    for patch, model in zip(box['boxes'], models):
+        patch.set_facecolor(colors[model])
+        patch.set_alpha(0.6)
+    ax.set_xlabel(column)
+    ax.set_title(f'Boxplot of {column} by Model')
+    ax.grid(True, axis='x', linestyle='--', alpha=0.5)
+    plt.tight_layout()
+    plt.show()
+
+# -----------------------------------------------------------------
+# Plot: Throughput vs Energy overlayed scatter by Model
+# -----------------------------------------------------------------
+def plot_throughput_vs_energy(df):
+    """
+    Overlay scatter of throughput_queries_per_sec vs energy_per_token_kwh for all models.
+    """
+    colors = assign_model_colors(df)
+    plt.figure(figsize=(8, 6))
+    for model, subset in df.groupby('model'):
+        plt.scatter(subset['throughput_queries_per_sec'],
+                    subset['energy_per_token_kwh'],
+                    alpha=0.7, label=model, color=colors[model])
+    plt.xlabel('Throughput (queries/sec)')
+    plt.ylabel('Energy per Token (kWh)')
+    plt.title('Throughput vs Energy per Token by Model')
+    plt.legend(title='Model')
+    plt.grid(True, linestyle='--', alpha=0.4)
+    plt.tight_layout()
+    plt.show()
+
+# -----------------------------------------------------------------
+# Plot: General Scatter overlayed by Model
+# -----------------------------------------------------------------
+def plot_scatter_by_model(df, x_column, y_column):
+    """
+    Overlay scatter of y_column vs x_column for all models.
+    """
+    if x_column not in df or y_column not in df:
+        print(f"Columns '{x_column}' or '{y_column}' not found in DataFrame.")
+        return
+    colors = assign_model_colors(df)
+    plt.figure(figsize=(8, 6))
+    for model, subset in df.groupby('model'):
+        plt.scatter(subset[x_column], subset[y_column],
+                    alpha=0.7, label=model, color=colors[model])
+    plt.xlabel(x_column)
+    plt.ylabel(y_column)
+    plt.title(f'{y_column} vs {x_column} by Model')
+    plt.legend(title='Model')
+    plt.grid(True, linestyle='--', alpha=0.4)
+    plt.tight_layout()
+    plt.show()
+
+# -----------------------------------------------------------------
+# Plot: Correlation Matrix per Model (no change)
+# -----------------------------------------------------------------
+def plot_corr_by_model(df):
+
+    cols = [
+        'energy_per_token_kwh',
+        'flops_per_token',
+        'average_latency_ms_per_batch',
+        #'throughput_queries_per_sec',
+        'throughput_tokens_per_sec',
+        'gpu_utilization_proc_all',
+        'gpu_power_proc_all'
+    ]
+    for model, subset in df.groupby('model'):
+        data = subset[cols].dropna()
+        if data.shape[0] < 2:
+            continue
+        corr = data.corr()
+        fig, ax = plt.subplots(figsize=(8, 6))
+        im = ax.imshow(corr, vmin=-1, vmax=1)
+        ax.set_xticks(np.arange(len(cols)))
+        ax.set_yticks(np.arange(len(cols)))
+        ax.set_xticklabels(cols, rotation=45, ha='right')
+        ax.set_yticklabels(cols)
+        ax.set_title(f'Correlation Matrix for {model}')
+        cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        cbar.ax.set_ylabel('Correlation coeff', rotation=-90, va='bottom')
+        plt.tight_layout()
+        plt.show()
+
+# -----------------------------------------------------------------
+# Plot: Divergence vs Various X columns overlayed by Model
+# -----------------------------------------------------------------
+def plot_divergence_by_model(df, x_column):
+    """
+    Overlay scatter of divergence_energy_flops vs x_column for all models.
+    """
+    if x_column not in df:
+        print(f"Column '{x_column}' not found in DataFrame.")
+        return
+    colors = assign_model_colors(df)
+    plt.figure(figsize=(8, 6))
+    for model, subset in df.groupby('model'):
+        plt.scatter(subset[x_column], subset['divergence_energy_flops'],
+                    alpha=0.7, label=model, color=colors[model])
+    plt.xlabel(x_column)
+    plt.ylabel('divergence_energy_flops')
+    plt.title(f'Divergence vs {x_column} by Model')
+    plt.legend(title='Model')
+    plt.grid(True, linestyle='--', alpha=0.4)
+    plt.tight_layout()
+    plt.show()
+
+
+# -----------------------------------------------------------------
+# Master function to run all model-specific plots
+# -----------------------------------------------------------------
 def plot_all_diagnostics(df):
-    """
-    Runs the full diagnostics suite on a cleaned dataset.
-    """
+
+    # Histograms and boxplots
     print("📊 Plotting histogram...")
-    plot_histogram(df)
-    
-    print("📊 Plotting normalised histogram...")
-    plot_histogram_zscore(df, 'energy_per_token_kwh')
-
+    plot_energy_histograms(df)
     print("📦 Plotting boxplot...")
-    plot_boxplot(df)
+    plot_energy_boxplots(df)
 
-    print("🔬 Scatter: Energy vs FLOPs...")
-    plot_scatter(df)
+    # Scatter plots
+    print("🔬 Scatter: by model...")
+    plot_scatter_by_model(df, 'flops_per_token', 'energy_per_token_kwh')
 
-    print("📈 Scatter: Divergence vs Batch Size...")
-    plot_divergence(df)
-
+    # Correlations
     print("🔗 Correlation matrix...")
-    plot_correlation_matrix(df)
+    plot_corr_by_model(df)
+
+    print("🔬 Scatter: Throughput vs energy...")
+    plot_throughput_vs_energy(df)
+
+    # Divergence comparisons
+    print("📈 Scatter: Divergence patterns...")
+    x_vars = [
+        'num_processes',
+        'batch_size___fixed_batching',
+        'decoder_config_decoding_mode' if 'decoder_config_decoding_mode' in df.columns else None,
+        'temperature' if 'temperature' in df.columns else None,
+        'latency_numeric' if 'latency_numeric' in df.columns else None
+    ]
+    for x in filter(None, x_vars):
+        plot_divergence_by_model(df, x)
 
 # ---------------------------
 # Main Entry Point
@@ -134,11 +200,5 @@ if __name__ == "__main__":
 
     csv_path = "results/controlled_results.csv"
     df = run_load_clean_diagnose_data(csv_path)
-
-    plot_histogram(df, 'energy_per_token_kwh')
-    plot_histogram_zscore(df, 'energy_per_token_kwh')
-    plot_boxplot(df, 'energy_per_token_kwh')
-    plot_scatter(df, 'flops_per_token', 'energy_per_token_kwh')
-    plot_divergence(df, 'energy_per_token_kwh', 'divergence_energy_flops')
-    columns_to_correlate = ['energy_per_token_kwh', 'flops_per_token', 'divergence_energy_flops']
-    plot_correlation_matrix(df, columns_to_correlate)
+    
+    plot_all_diagnostics(df)

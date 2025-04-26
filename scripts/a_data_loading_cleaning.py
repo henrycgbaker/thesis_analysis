@@ -8,7 +8,8 @@ from typing import (
 )
 
 # -----------------------------------------------------------------
-# 1. Define helper functions to clean column names and resolve duplicates
+# lOAD & CLEAN
+# Define helper functions to clean column names and resolve duplicates
 # -----------------------------------------------------------------
 def clean_column(col: str) -> str:
     """
@@ -25,6 +26,7 @@ def clean_column(col: str) -> str:
     special_mappings = {
         "setup_cpu_model": "cpu_model",
         "setup_gpu_model": "gpu_model",
+        "setup_cycle_id": "cycle_id",
         "model_architecture_total_params": "total_params",
         "model_architecture_architecture": "model_arch"
     }
@@ -126,12 +128,11 @@ def clean_and_reorder_columns(df: pd.DataFrame, desired_order: list) -> pd.DataF
     final_order = ordered_cols + remaining_cols
     return df[final_order]
 
-# -----------------------------------------------------------------
-# 2. Define preferred column order (tailor as needed)
-# -----------------------------------------------------------------
+# Define preferred column order 
 desired_order = [
     "config_name",
     "experiment_id",
+    "cycle_id",
     "date_time",
     "model",
     # num_process
@@ -234,9 +235,7 @@ desired_order = [
     "per-process_emissions_0", "per-process_emissions_1", "per-process_emissions_2", "per-process_emissions_3"
 ]
 
-# -----------------------------------------------------------------
-# 3. Load controlled experiments CSV and clean it
-# -----------------------------------------------------------------
+# Load CSV and clean it
 def load_and_clean_data(csv_path: str) -> pd.DataFrame:
     """
     Loads a CSV from csv_path and cleans the column names and order.
@@ -245,51 +244,8 @@ def load_and_clean_data(csv_path: str) -> pd.DataFrame:
     df_cleaned = clean_and_reorder_columns(df, desired_order)
     return df_cleaned
 
-def filter_by_dominant_token_count(df: pd.DataFrame, token_col='total_generated_tokens') -> pd.DataFrame:
-    original_counts = df[token_col].value_counts().sort_index()
-
-    # If only one unique value, no need to filter
-    if len(original_counts) == 1:
-        print(f"✅ All rows have consistent '{token_col}' = {original_counts.index[0]}")
-        print("--" * 50)
-        return df
-
-    # Otherwise, drop all rows not matching the most common value
-    mode_val = df[token_col].mode().iloc[0]
-    dropped_rows = df[df[token_col] != mode_val]
-    dropped_row_config_names = dropped_rows['config_name'].unique()
-    filtered_df = df[df[token_col] == mode_val]
-
-    # Log warning and detailed info
-    warnings.warn(f"⚠️ Dropped {len(dropped_rows)} rows due to inconsistent '{token_col}' values", stacklevel=2)
-    print(f"⚠️ Dropped {len(dropped_rows)} rows due to inconsistent '{token_col}' values")
-    print(f"- Filtering rows to dominant '{token_col}' = {mode_val}")
-    print(f"- Retained {len(filtered_df)} of {len(df)} rows")
-    print(f"- Dropped configs: {dropped_row_config_names.tolist()}")
-    print(f"- Dropped row indices: {dropped_rows.index.tolist()}")
-    print(f"Original distribution:\n{original_counts}")
-    print("--" * 50)
-
-    return filtered_df
-
 # -----------------------------------------------------------------
-# 4. Create Derived Columns
-# -----------------------------------------------------------------
-def create_derived_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Create derived columns:
-      - flops_per_token,
-      - energy_per_token_kwh,
-      - divergence_energy_flops.
-    """
-    df = df.copy()
-    df['flops_per_token'] = df['flops'] / df['total_generated_tokens']
-    df['energy_per_token_kwh'] = df['total_energy_kwh'] / df['total_generated_tokens']
-    df['divergence_energy_flops'] = df['energy_per_token_kwh'] / df['flops_per_token']
-    return df
-
-# -----------------------------------------------------------------
-# 5. Drop unused columns (two rounds)
+# Drop unused columns (two rounds)
 # -----------------------------------------------------------------
 
 def drop_unused_columns_1(df: pd.DataFrame) -> pd.DataFrame:
@@ -333,10 +289,10 @@ def drop_unused_columns_2(df: pd.DataFrame) -> pd.DataFrame:
     columns_to_drop_2 = [
         "cpu_usage_percent",
         "cpu_memory_usage_bytes",
-        "gpu_utilization_percent_0",
-        "gpu_utilization_percent_1",
-        "gpu_utilization_percent_2",
-        "gpu_utilization_percent_3",
+        #"gpu_utilization_percent_0",
+        #"gpu_utilization_percent_1",
+        #"gpu_utilization_percent_2",
+        #"gpu_utilization_percent_3",
         "gpu_current_memory_allocated_bytes",
         "gpu_max_memory_allocated_bytes",
         "cpu_current_memory_allocated_bytes",
@@ -345,10 +301,10 @@ def drop_unused_columns_2(df: pd.DataFrame) -> pd.DataFrame:
         "cpu_power_process_1",
         "cpu_power_process_2",
         "cpu_power_process_3",
-        "gpu_power_process_0",
-        "gpu_power_process_1",
-        "gpu_power_process_2",
-        "gpu_power_process_3",
+        #"gpu_power_process_0",
+        #"gpu_power_process_1",
+        #"gpu_power_process_2",
+        #"gpu_power_process_3",
         "ram_power_process_0",
         "ram_power_process_1",
         "ram_power_process_2",
@@ -357,73 +313,45 @@ def drop_unused_columns_2(df: pd.DataFrame) -> pd.DataFrame:
         "cpu_energy_process_1",
         "cpu_energy_process_2",
         "cpu_energy_process_3",
-        "gpu_energy_process_0",
-        "gpu_energy_process_1",
-        "gpu_energy_process_2",
-        "gpu_energy_process_3",
-        "ram_energy_process_0",
-        "ram_energy_process_1",
-        "ram_energy_process_2",
-        "ram_energy_process_3",
+        #"gpu_energy_process_0",
+        #"gpu_energy_process_1",
+        #"gpu_energy_process_2",
+        #"gpu_energy_process_3",
+        #"ram_energy_process_0",
+        #"ram_energy_process_1",
+        #"ram_energy_process_2",
+        #"ram_energy_process_3",
         "total_energy_joules_process_0",
         "total_energy_joules_process_1",
         "total_energy_joules_process_2",
         "total_energy_joules_process_3",
         "cpu_power_avg",
         "ram_energy_total",
-        "models"
+        #"models"
     ]
     return df.drop(columns=columns_to_drop_2, errors='ignore')
 
+
 # -----------------------------------------------------------------
-# 6. Additional helper functions for diagnostics
+# VERIFY, DIAGNOSE, CORRECT GENERATED TOKENS
 # -----------------------------------------------------------------
 
-import warnings
-import pandas as pd
-
-def verify_flops(df: pd.DataFrame, flops_col='flops') -> None:
-    """
-    Verify that the FLOPs values are constant across runs.
-    Prints detailed diagnostic info similar to filtering functions.
-    """
-    unique_flops = df[flops_col].unique()
-    original_counts = df[flops_col].value_counts().sort_index()
-    
-    if len(unique_flops) == 1:
-        print(f"✅ FLOPs value is constant: {unique_flops[0]}")
-        print(f"Original distribution:\n{original_counts}")
-    else:
-        warnings.warn(f"⚠️ FLOPs values are NOT constant: {unique_flops}", stacklevel=2)
-        print(f"⚠️ FLOPs values are NOT constant: {unique_flops}")
-        print(f"Original distribution:\n{original_counts}")
-        
-        # Identify rows that do not have the dominant FLOPs value
-        dominant_flops = df[flops_col].mode().iloc[0]
-        deviating_rows = df[df[flops_col] != dominant_flops]
-        deviating_configs = []
-        if 'config_name' in df.columns:
-            deviating_configs = deviating_rows['config_name'].unique().tolist()
-        
-        print(f"- Dominant FLOPs value: {dominant_flops}")
-        print(f"- Affected rows count: {len(deviating_rows)}")
-        print(f"- Affected row indices: {deviating_rows.index.tolist()}")
-        if deviating_configs:
-            print(f"- Affected configs: {deviating_configs}")
-    print("--" * 50)
-
-def verify_generated_tokens(df: pd.DataFrame, total_generated_tokens_col='total_generated_tokens') -> None:
+def verify_generated_tokens(df: pd.DataFrame, total_generated_tokens_col='total_generated_tokens'):
     """
     Verify that the total_generated_tokens values are constant across runs.
     Prints detailed diagnostic info similar to filtering functions.
     """
+    
     unique_tokens = df[total_generated_tokens_col].unique()
     original_counts = df[total_generated_tokens_col].value_counts().sort_index()
     
     if len(unique_tokens) == 1:
         print(f"✅ Total generated tokens value is constant: {unique_tokens[0]}")
         print(f"Original distribution:\n{original_counts}")
+        print("--" * 50)
+        return True
     else:
+        unique_tokens_flag = False
         warnings.warn(f"⚠️ Total generated tokens values are NOT constant: {unique_tokens}", stacklevel=2)
         print(f"⚠️ Total generated tokens values are NOT constant: {unique_tokens}")
         print(f"Original distribution:\n{original_counts}")
@@ -440,8 +368,107 @@ def verify_generated_tokens(df: pd.DataFrame, total_generated_tokens_col='total_
         print(f"- Affected row indices: {deviating_rows.index.tolist()}")
         if deviating_configs:
             print(f"- Affected configs: {deviating_configs}")
+        print("--" * 50)
+        return False
+
+
+def identify_total_generated_tokens_differentiators(df: pd.DataFrame, total_generated_tokens_col='total_generated_tokens', exclude_cols=None):
+    """
+    Identify columns that are constant within each total_generated_tokens group but differ between groups.
+    """
+    if exclude_cols is None:
+        exclude_cols = []
+    exclude_cols = set(exclude_cols + [total_generated_tokens_col])
+    
+    differentiators = {}
+    unique_values = df[total_generated_tokens_col].unique()
+    
+    for col in df.columns:
+        if col in exclude_cols:
+            continue
+        
+        group_values = {}
+        valid = True
+        for val in unique_values:
+            subset = df.loc[df[total_generated_tokens_col] == val, col]
+            if isinstance(subset, pd.DataFrame):
+                subset = subset.iloc[:, 0]  # ensure it's a Series
+            values = subset.unique()
+            if len(values) == 1:
+                group_values[val] = values[0]
+            else:
+                valid = False
+                break
+        if valid and len(set(group_values.values())) > 1:
+            differentiators[col] = group_values
+
+    return differentiators
+
+def filter_by_dominant_token_count(df: pd.DataFrame, token_col='total_generated_tokens') -> pd.DataFrame:
+    original_counts = df[token_col].value_counts().sort_index()
+
+    # If only one unique value, no need to filter
+    if len(original_counts) == 1:
+        print(f"✅ All rows have consistent '{token_col}' = {original_counts.index[0]}")
+        print("--" * 50)
+        return df
+
+    # Otherwise, drop all rows not matching the most common value
+    mode_val = df[token_col].mode().iloc[0]
+    dropped_rows = df[df[token_col] != mode_val]
+    dropped_row_config_names = dropped_rows['config_name'].unique()
+    filtered_df = df[df[token_col] == mode_val]
+
+    # Log warning and detailed info
+    warnings.warn(f"⚠️ Dropped {len(dropped_rows)} rows due to inconsistent '{token_col}' values", stacklevel=2)
+    print(f"⚠️ Dropped {len(dropped_rows)} rows due to inconsistent '{token_col}' values")
+    print(f"- Filtering rows to dominant '{token_col}' = {mode_val}")
+    print(f"- Retained {len(filtered_df)} of {len(df)} rows")
+    print(f"- Dropped configs: {dropped_row_config_names.tolist()}")
+    print(f"- Dropped row indices: {dropped_rows.index.tolist()}")
+    print(f"Original distribution:\n{original_counts}")
     print("--" * 50)
 
+    return filtered_df
+
+# -----------------------------------------------------------------
+# VERIFY, DIAGNOSE, CORRECT GENERATED FLOPS
+# -----------------------------------------------------------------
+
+def verify_flops(df: pd.DataFrame, flops_col='flops') -> None:
+    """
+    Verify that the FLOPs values are constant across runs.
+    Prints detailed diagnostic info similar to filtering functions.
+    """    
+    unique_flops = df[flops_col].unique()
+    original_counts = df[flops_col].value_counts().sort_index()
+    
+    if len(unique_flops) == 1:
+        print(f"✅ FLOPs value is constant: {unique_flops[0]}")
+        print(f"Original distribution:\n{original_counts}")
+        print("--" * 50)
+        return True
+    else:
+        unique_flops_flag = False
+        warnings.warn(f"NB: FLOPs values are NOT constant: {unique_flops}", stacklevel=2)
+        print(f"NB: FLOPs values are NOT constant: {unique_flops}")
+        print(f"Original distribution:\n{original_counts}\n")
+        
+        # Identify rows that do not have the dominant FLOPs value
+        dominant_flops = df[flops_col].mode().iloc[0]
+        deviating_rows = df[df[flops_col] != dominant_flops]
+        deviating_configs = []
+        if 'config_name' in df.columns:
+            deviating_configs = deviating_rows['config_name'].unique().tolist()
+        
+        print(f"Dominant FLOPs value: {dominant_flops}")
+        print(f"- Affected rows count: {len(deviating_rows)}")
+        print(f"- Affected row indices: {deviating_rows.index.tolist()}")
+        if deviating_configs:
+            print(f"- Affected configs: {deviating_configs}")
+        print("--" * 50)
+        return False
+    
 
 def identify_flop_differentiators(df: pd.DataFrame, flops_col='flops', exclude_cols=None):
     """
@@ -476,40 +503,40 @@ def identify_flop_differentiators(df: pd.DataFrame, flops_col='flops', exclude_c
     
     return differentiators
 
-def identify_total_generated_tokens_differentiators(df: pd.DataFrame, total_generated_tokens_col='total_generated_tokens', exclude_cols=None):
-    """
-    Identify columns that are constant within each total_generated_tokens group but differ between groups.
-    """
-    if exclude_cols is None:
-        exclude_cols = []
-    exclude_cols = set(exclude_cols + [total_generated_tokens_col])
-    
-    differentiators = {}
-    unique_values = df[total_generated_tokens_col].unique()
-    
-    for col in df.columns:
-        if col in exclude_cols:
-            continue
-        
-        group_values = {}
-        valid = True
-        for val in unique_values:
-            subset = df.loc[df[total_generated_tokens_col] == val, col]
-            if isinstance(subset, pd.DataFrame):
-                subset = subset.iloc[:, 0]  # ensure it's a Series
-            values = subset.unique()
-            if len(values) == 1:
-                group_values[val] = values[0]
-            else:
-                valid = False
-                break
-        if valid and len(set(group_values.values())) > 1:
-            differentiators[col] = group_values
 
-    return differentiators
+def correct_flops(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Correct FLOPs based on model name suffix.
+    """
+    def compute(model_name, original):
+        if model_name.endswith("1B"):
+            return 16_949_970_993_152.0
+        elif model_name.endswith("3B"):
+            return 52_638_582_308_864.0
+        elif model_name.endswith("8B"):
+            raise ValueError("Please define correct FLOPs for 8B models.")
+        else:
+            return original
+    
+    df = df.copy()
+    df['flops'] = df.apply(lambda r: compute(r['model'], r['flops']), axis=1)
+    return df
 
 # -----------------------------------------------------------------
-# 7. aggregate config grouping metrics across runs
+# Create Derived Columns
+# -----------------------------------------------------------------
+def create_derived_columns(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    df['flops_per_token'] = df['flops'] / df['total_generated_tokens']
+    df['energy_per_token_kwh'] = df['total_energy_kwh'] / df['total_generated_tokens']
+    df['divergence_energy_flops'] = df['energy_per_token_kwh'] / df['flops_per_token']
+    df['gpu_utilization_proc_all'] = df[['gpu_utilization_percent_0', 'gpu_utilization_percent_1', 'gpu_utilization_percent_2', 'gpu_utilization_percent_3']].mean(axis=1)
+    df['gpu_power_proc_all'] = df[['gpu_power_process_0', 'gpu_power_process_1', 'gpu_power_process_2', 'gpu_power_process_3']].mean(axis=1)
+
+    return df
+
+# -----------------------------------------------------------------
+# aggregate config grouping metrics across runs
 # -----------------------------------------------------------------
 
 def add_config_group_stats(
@@ -563,36 +590,53 @@ def add_config_group_stats(
 def run_load_clean_diagnose_data(csv_path: str = "results/controlled_results.csv") -> pd.DataFrame:
     # Load and clean data
     df = load_and_clean_data(csv_path)
-    df = create_derived_columns(df)
-    df = filter_by_dominant_token_count(df)
-    
+
     # Drop unused columns
     df = drop_unused_columns_1(df)
     df = drop_unused_columns_2(df)
     
-    # Diagnostics / sanity checks
-    verify_flops(df)
-    verify_generated_tokens(df)
-    
-    # Identify differentiators for FLOPs
-    unique_flops = df['flops'].unique()
-    if unique_flops.size > 1:
-        print("Identifying differentiators for FLOPs...")
-        flop_diff = identify_flop_differentiators(df)
-        print("FLOP Differentiators:")
-        for col, vals in flop_diff.items():
-            print(f"{col}: {vals}")
-    
-    # Identify differentiators for total_generated_tokens
-    unique_tokens = df['total_generated_tokens'].unique()
-    if unique_tokens.size > 1:
-        print("Identifying differentiators for total_generated_tokens...")
+    # sanity check: verify generated tokens
+    if not verify_generated_tokens(df):
+        # 1 identify differentiators 
         token_diff = identify_total_generated_tokens_differentiators(df)
         print("Total Generated Tokens Differentiators:")
         for col, vals in token_diff.items():
             print(f"{col}: {vals}")
     
+        # 2 correct
+        df = filter_by_dominant_token_count(df)
+    
+    # sanity check: verify FLOPs
+    print("Round 1: Verfifying FLOPs on raw df")
+    if not verify_flops(df):
+        # 1 identify differentiators for FLOPs
+        flop_diff = identify_flop_differentiators(df)
+        print("FLOP Differentiators:")
+        for col, vals in flop_diff.items():
+            print(f"{col}: {vals}")
+    
+        # 2 correct FLOPs if necessary
+        df = correct_flops(df)
+        print("Round 2: Verfifying FLOPs on corrected df")
+        verify_flops(df)
+        
+    if len(df['flops'].unique()) == len(df['model'].unique()):
+        print("✅ FLOPs are unique per model")
+    else:
+        print("⚠️ FLOPs are NOT unique per model")
+    
+    print("--" * 50)
+    # check cycles
+    print(f"cyles present: {df['cycle_id'].unique()}")
+    
+    # create derived stats
+    df = create_derived_columns(df)
+    
+    # aggregate
     df = add_config_group_stats(df)
+    
+    # clean up
+    df['model'] = df['model'].str.removeprefix('meta-llama/')
     
     return df
 
@@ -601,23 +645,4 @@ def run_load_clean_diagnose_data(csv_path: str = "results/controlled_results.csv
 # 9. Main execution block
 # -----------------------------------------------------------------
 if __name__ == "__main__":
-    csv_path = "results/controlled_results.csv"
-
-    # 1) load & globally clean column names + reorder
-    df = load_and_clean_data(csv_path)
-
-    # 2) create derived columns
-    df = create_derived_columns(df)
-
-    # 3) filter / diagnostics / drop unused…
-    df = filter_by_dominant_token_count(df)
-    df = drop_unused_columns_1(df)
-    df = drop_unused_columns_2(df)
-    verify_flops(df)
-    verify_generated_tokens(df)
-
-    # 4) finally aggregate
-    df = add_config_group_stats(df)
-
-    # store for interactive use
-    globals()['df'] = df_agg
+    df = run_load_clean_diagnose_data()
