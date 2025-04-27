@@ -175,10 +175,20 @@ def plot_latency_burst_size(
             ax.text(xs[-1], base, lbl, ha='right', va='bottom',
                     fontsize='small', color='gray', alpha=0.4)
 
+    # ── custom x-tick mapping: position=mean, label="min-max" ──
+    all_means = sorted(df2['latency_numeric'].unique())
+    tick_labels = []
+    for μ in all_means:
+        grp = df2[df2['latency_numeric']==μ]
+        lo = grp['latency_simulation_delay_min'].min()
+        hi = grp['latency_simulation_delay_max'].max()
+        tick_labels.append(f"between \n{lo} - {hi}")
+    ax.set_xticks(all_means)
+    ax.set_xticklabels(tick_labels)
+
     ax.legend(loc='best', title='Model:Class')
     plt.tight_layout()
-    plt.show()
-    
+    plt.show()    
 
 def classify_by_burst_interval_and_constant(df: pd.DataFrame):
     df2 = add_latency_numeric(df.copy())
@@ -280,6 +290,17 @@ def plot_latency_burst_interval(
             ax.axhline(base, linestyle=':', color='gray', alpha=0.6)
             ax.text(xs[-1], base, lbl, ha='right', va='bottom',
                     fontsize='small', color='gray', alpha=0.4)
+
+    # ── custom x-tick mapping: position=mean, label="min-max" ──
+    all_means = sorted(df2['latency_numeric'].unique())
+    tick_labels = []
+    for μ in all_means:
+        grp = df2[df2['latency_numeric']==μ]
+        lo = grp['latency_simulation_delay_min'].min()
+        hi = grp['latency_simulation_delay_max'].max()
+        tick_labels.append(f"between \n{lo} - {hi}")
+    ax.set_xticks(all_means)
+    ax.set_xticklabels(tick_labels)
 
     ax.legend(loc='best', title='Model:Class')
     plt.tight_layout()
