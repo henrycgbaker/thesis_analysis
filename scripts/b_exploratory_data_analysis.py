@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator, FuncFormatter
 from matplotlib import cm
 import numpy as np
+from pandas.api.types import is_numeric_dtype
 
 # -----------------------------------------------------------------
 # Helpers for coloring by model
@@ -188,6 +189,9 @@ def plot_all_diagnostics(df):
         'latency_numeric' if 'latency_numeric' in df.columns else None
     ]
     for x in filter(None, x_vars):
+        if not is_numeric_dtype(df[x]):
+            print(f"Skipping non-numeric column {x!r}")
+            continue
         plot_divergence_by_model(df, x)
 
 # ---------------------------
