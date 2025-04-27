@@ -177,3 +177,219 @@ def plot_decoder_temperature(
     ax.legend(loc='best')
     plt.tight_layout()
     plt.show()
+
+# ---------------------------
+# Plot: Decoder Top‑k vs Energy
+# ---------------------------
+
+def plot_decoder_top_k(
+    dfs,
+    normalise_axes=None,
+    plot_mean=True,
+    plot_band=True,
+    plot_raw=True,
+    add_baseline_energy=False,
+    cycle_id=None,
+    model=None
+):
+    """
+    Plot Energy-per-Token vs Top‑k, grouping lines by temperature for one or multiple models.
+
+    Parameters:
+        dfs: dict with 'decoding' DataFrame
+        normalise_axes: ['ax1'] to normalise energy axis
+        plot_mean, plot_band, plot_raw, add_baseline_energy: booleans
+        cycle_id: filter by cycle_id
+        model: string or list to filter models
+    """
+    df = dfs.get('decoding')
+    if df is None:
+        print("decoding DataFrame not found in dfs.")
+        return
+
+    # Filters
+    if cycle_id is not None:
+        df = df[df['cycle_id']==cycle_id]
+    if model is not None:
+        models = model if isinstance(model,(list,tuple)) else [model]
+        df = df[df['model'].isin(models)]
+    else:
+        models = sorted(df['model'].unique())
+
+    # Only top_k mode
+    df_topk = df[df['decoder_config_decoding_mode']=='top_k']
+    if df_topk.empty:
+        print("No top_k data to plot.")
+        return
+
+    # Unique temperatures
+    temps = sorted(df_topk['decoder_temperature'].unique())
+    cmap = plt.cm.viridis
+    colors_t = {t: cmap(i/len(temps)) for i,t in enumerate(temps)}
+
+    # Styles
+    linestyles = ['-', '--', '-.', (0,(5,1))]
+    markers    = ['o','D','^','s']
+    alpha_line    = 1.0
+    alpha_scatter = 0.2
+    alpha_band    = 0.2
+
+    fig, ax = plt.subplots(figsize=(8,6))
+    ax.set_xlabel('Top‑k Value')
+    ax.set_ylabel('Energy-per-Token (kWh)')
+    ax.grid(True, axis='y', linestyle='--', alpha=0.4)
+    ax.grid(True, axis='x', linestyle=':', alpha=0.2)
+
+    norm_axes = [ax] if normalise_axes and 'ax1' in normalise_axes else []
+
+    # Plot for each model and temperature
+    for m_idx, m_name in enumerate(models):
+        style = linestyles[m_idx % len(linestyles)]
+        marker = markers[m_idx % len(markers)]
+        for t in temps:
+            sub = df_topk[(df_topk['model']==m_name) & (df_topk['decoder_temperature']==t)]
+            if sub.empty: continue
+            stats = sub.groupby('decoder_top_k').agg(
+                energy_mean=('energy_per_token_kwh','mean'),
+                energy_std =('energy_per_token_kwh','std')
+            )
+            _plot_with_band(
+                ax, sub, 'decoder_top_k','energy_per_token_kwh',
+                stats, 'energy_mean','energy_std',
+                color=colors_t[t],
+                raw_kwargs={'alpha':alpha_scatter,'marker':marker,'color':colors_t[t]},
+                line_kwargs={'linestyle':style,'marker':marker,'alpha':alpha_line,'color':colors_t[t]},
+                band_alpha=alpha_band,
+                normalise_axes=norm_axes,
+                plot_mean=plot_mean,
+                plot_band=plot_band,
+                plot_raw=plot_raw,
+                label_mean=f"{m_name}:temp={t}"
+            )
+    if add_baseline_energy:
+        for m_name in models:
+            base_df = dfs.get('decoding')
+            base_df = base_df[(base_df['model']==m_name) & (base_df['decoder_config_decoding_mode']=='greedy')]
+            if cycle_id is not None:
+                base_df = base_df[base_df['cycle_id']==cycle_id]
+            if base_df.empty: continue
+            stats = base_df.groupby('decoder_temperature')['energy_per_token_kwh'].mean()
+            is_norm = bool(norm_axes)
+            base = 1.0 if is_norm else stats.iloc[0]
+            xmin, xmax = ax.get_xlim()
+            label = f"Baseline {m_name}:greedy"
+            ax.hlines(base, xmin, xmax, linestyle=':', color='gray', alpha=0.4)
+            ax.text(xmax, base, label, ha='right', va='bottom', fontsize='small', color='gray', alpha=0.4)
+
+    plt.title('Energy-per-Token vs Top‑k (grouped by Temperature)')
+    ax.legend(loc='best', title='Model:Temp')
+    plt.tight_layout()
+    plt.show()
+
+# ---------------------------
+# Plot: Decoder Top‑p vs Energy
+# ---------------------------
+
+def plot_decoder_top_p(
+    dfs,
+    normalise_axes=None,
+    plot_mean=True,
+    plot_band=True,
+    plot_raw=True,
+    add_baseline_energy=False,
+    cycle_id=None,
+    model=None
+):
+    """
+    Plot Energy-per-Token vs Top‑p, grouping lines by temperature for one or multiple models.
+
+    Parameters:
+        dfs: dict with 'decoding' DataFrame
+        normalise_axes: ['ax1'] to normalise energy axis
+        plot_mean, plot_band, plot_raw, add_baseline_energy: booleans
+        cycle_id: filter by cycle_id
+        model: string or list to filter models
+    """
+    df = dfs.get('decoding')
+    if df is None:
+        print("decoding DataFrame not found in dfs.")
+        return
+
+    # Filters
+    if cycle_id is not None:
+        df = df[df['cycle_id']==cycle_id]
+    if model is not None:
+        models = model if isinstance(model,(list,tuple)) else [model]
+        df = df[df['model'].isin(models)]
+    else:
+        models = sorted(df['model'].unique())
+
+    # Only top_p mode
+    df_topp = df[df['decoder_config_decoding_mode']=='top_p']
+    if df_topp.empty:
+        print("No top_p data to plot.")
+        return
+
+    # Unique temperatures
+    temps = sorted(df_topp['decoder_temperature'].unique())
+    cmap = plt.cm.viridis
+    colors_t = {t: cmap(i/len(temps)) for i,t in enumerate(temps)}
+
+    # Styles
+    linestyles = ['-', '--', '-.', (0,(5,1))]
+    markers    = ['o','D','^','s']
+    alpha_line    = 1.0
+    alpha_scatter = 0.2
+    alpha_band    = 0.2
+
+    fig, ax = plt.subplots(figsize=(8,6))
+    ax.set_xlabel('Top‑p Value')
+    ax.set_ylabel('Energy-per-Token (kWh)')
+    ax.grid(True, axis='y', linestyle='--', alpha=0.4)
+    ax.grid(True, axis='x', linestyle=':', alpha=0.2)
+
+    norm_axes = [ax] if normalise_axes and 'ax1' in normalise_axes else []
+
+    # Plot for each model and temperature
+    for m_idx, m_name in enumerate(models):
+        style = linestyles[m_idx % len(linestyles)]
+        marker = markers[m_idx % len(markers)]
+        for t in temps:
+            sub = df_topp[(df_topp['model']==m_name) & (df_topp['decoder_temperature']==t)]
+            if sub.empty: continue
+            stats = sub.groupby('decoder_top_p').agg(
+                energy_mean=('energy_per_token_kwh','mean'),
+                energy_std =('energy_per_token_kwh','std')
+            )
+            _plot_with_band(
+                ax, sub, 'decoder_top_p','energy_per_token_kwh',
+                stats, 'energy_mean','energy_std',
+                color=colors_t[t],
+                raw_kwargs={'alpha':alpha_scatter,'marker':marker,'color':colors_t[t]},
+                line_kwargs={'linestyle':style,'marker':marker,'alpha':alpha_line,'color':colors_t[t]},
+                band_alpha=alpha_band,
+                normalise_axes=norm_axes,
+                plot_mean=plot_mean,
+                plot_band=plot_band,
+                plot_raw=plot_raw,
+                label_mean=f"{m_name}:temp={t}"
+            )
+    if add_baseline_energy:
+        for m_name in models:
+            base_df = dfs.get('decoding')
+            base_df = base_df[(base_df['model']==m_name) & (base_df['decoder_config_decoding_mode']=='greedy')]
+            if cycle_id is not None:
+                base_df = base_df[base_df['cycle_id']==cycle_id]
+            if base_df.empty: continue
+            stats = base_df.groupby('decoder_temperature')['energy_per_token_kwh'].mean()
+            is_norm = bool(norm_axes)
+            base = 1.0 if is_norm else stats.iloc[0]
+            xmin, xmax = ax.get_xlim()
+            label = f"Baseline {m_name}:greedy"
+            ax.hlines(base, xmin, xmax, linestyle=':', color='gray', alpha=0.4)
+            ax.text(xmax, base, label, ha='right', va='bottom', fontsize='small', color='gray', alpha=0.4)
+
+    plt.title('Energy-per-Token vs Top‑p (grouped by Temperature)')
+    ax.legend(loc='best', title='Model:Temp')
+    plt.tight_layout()
+    plt.show()
