@@ -1,0 +1,7 @@
+{
+  "process_index": 0,
+  "gpu_id": 0,
+  "result_path": "/app/results/pt_tp_2gpu/raw/0001_c2/process_0.json",
+  "timestamp": "2026-01-20T12:40:17.861219",
+  "result_hash": "sha256:0d250c63fecbf95a"
+}

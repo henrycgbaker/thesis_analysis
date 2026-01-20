@@ -23,11 +23,13 @@ sharding:
   num_shards: 2
 
 vllm:
-  gpu_memory_utilization: 0.9
-  max_num_seqs: 256
+  gpu_memory_utilization: 0.7
+  max_num_seqs: 128
+  max_model_len: 2048
 
 prompts:
   type: huggingface
-  dataset: ai-energy-score
+  dataset: AIEnergyScore/text_generation
   split: train
+  column: text
   sample_size: 128

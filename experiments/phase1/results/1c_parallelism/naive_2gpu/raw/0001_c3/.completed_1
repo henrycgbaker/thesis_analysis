@@ -1,0 +1,7 @@
+{
+  "process_index": 1,
+  "gpu_id": 1,
+  "result_path": "/app/results/naive_2gpu/raw/0001_c3/process_1.json",
+  "timestamp": "2026-01-20T12:23:39.064749",
+  "result_hash": "sha256:c39948a720ea50ff"
+}

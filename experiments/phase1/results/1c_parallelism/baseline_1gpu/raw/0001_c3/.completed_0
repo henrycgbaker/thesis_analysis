@@ -1,0 +1,7 @@
+{
+  "process_index": 0,
+  "gpu_id": 0,
+  "result_path": "/app/results/baseline_1gpu/raw/0001_c3/process_0.json",
+  "timestamp": "2026-01-20T12:11:14.204757",
+  "result_hash": "sha256:812407194ffa2a56"
+}

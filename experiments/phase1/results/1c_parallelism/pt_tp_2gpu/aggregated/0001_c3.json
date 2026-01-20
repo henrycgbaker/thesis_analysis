@@ -1,0 +1,388 @@
+{
+  "schema_version": "2.0.0",
+  "experiment_id": "0001_c3",
+  "backend": "pytorch",
+  "backend_version": "transformers=4.57.6, torch=2.5.1+cu124",
+  "aggregation": {
+    "method": "sum_energy_avg_throughput",
+    "num_processes": 2,
+    "temporal_overlap_verified": true,
+    "gpu_attribution_verified": true,
+    "warnings": []
+  },
+  "total_tokens": 65536,
+  "total_energy_j": 109959.11893648803,
+  "total_inference_time_sec": 398.88296182919294,
+  "avg_tokens_per_second": 164.29883087924526,
+  "avg_energy_per_token_j": 1.6778430013502201,
+  "total_flops": 421101544931328.0,
+  "process_results": [
+    {
+      "schema_version": "2.0.0",
+      "experiment_id": "0001_c3",
+      "backend": "pytorch",
+      "backend_version": "transformers=4.57.6, torch=2.5.1+cu124",
+      "process_index": 0,
+      "gpu_id": 0,
+      "gpu_name": "NVIDIA A100-PCIE-40GB",
+      "gpu_is_mig": false,
+      "gpu_mig_profile": null,
+      "energy_measurement_warning": null,
+      "config_name": "parallel_pt_tp_2gpu",
+      "model_name": "meta-llama/Llama-3.2-3B",
+      "timestamps": {
+        "start": "2026-01-20T12:40:32.809176",
+        "end": "2026-01-20T12:44:01.833878",
+        "duration_sec": 209.024702
+      },
+      "inference_metrics": {
+        "total_tokens": 32768,
+        "input_tokens": 16384,
+        "output_tokens": 16384,
+        "inference_time_sec": 199.49248571693897,
+        "tokens_per_second": 164.25681339443884,
+        "latency_per_token_ms": 6.088027518217132,
+        "time_to_first_token_ms": null,
+        "latency_measurements": null
+      },
+      "energy_metrics": {
+        "total_energy_j": 54960.61075557628,
+        "gpu_energy_j": 32717.941174323783,
+        "cpu_energy_j": 22106.215480179522,
+        "ram_energy_j": 136.45410107300347,
+        "gpu_power_w": 155.56455839299238,
+        "cpu_power_w": 112.5,
+        "duration_sec": 0.0,
+        "emissions_kg_co2": 0.00003629260794021528,
+        "energy_per_token_j": 0.0
+      },
+      "compute_metrics": {
+        "flops_total": 210550772465664.0,
+        "flops_per_token": 6425499648.0,
+        "flops_per_second": 1055432096647.5685,
+        "peak_memory_mb": 0.0,
+        "model_memory_mb": 0.0,
+        "flops_method": "parameter_estimate",
+        "flops_confidence": "low",
+        "compute_precision": "float16"
+      },
+      "effective_config": {
+        "adapter": null,
+        "backend": "pytorch",
+        "batching_options": {
+          "batch_size": 8,
+          "dynamic_batching": false,
+          "max_tokens_per_batch": null,
+          "strategy": "static"
+        },
+        "config_name": "parallel_pt_tp_2gpu",
+        "cycle_id": null,
+        "decode_token_to_text": false,
+        "decoder_config": {
+          "do_sample": false,
+          "min_p": 0.0,
+          "no_repeat_ngram_size": 0,
+          "preset": "deterministic",
+          "repetition_penalty": 1.0,
+          "temperature": 0.0,
+          "top_k": 50,
+          "top_p": 1.0
+        },
+        "extra_metadata": {},
+        "fp_precision": "float16",
+        "gpu_list": [
+          0,
+          1
+        ],
+        "inference_type": "pure_generative",
+        "io_config": {
+          "results_dir": null
+        },
+        "is_encoder_decoder": false,
+        "latency_simulation": {
+          "enabled": false,
+          "mode": "poisson",
+          "seed": null,
+          "target_qps": 1.0
+        },
+        "max_input_tokens": 128,
+        "max_output_tokens": 128,
+        "min_output_tokens": 0,
+        "model_name": "meta-llama/Llama-3.2-3B",
+        "num_cycles": 6,
+        "num_input_prompts": 128,
+        "num_processes": 2,
+        "prompt_source": {
+          "column": "text",
+          "dataset": "AIEnergyScore/text_generation",
+          "sample_size": 128,
+          "seed": 42,
+          "shuffle": false,
+          "split": "train",
+          "subset": null,
+          "type": "huggingface"
+        },
+        "pytorch": null,
+        "quantization_config": {
+          "bnb_4bit_compute_dtype": "float16",
+          "bnb_4bit_quant_type": "nf4",
+          "bnb_4bit_use_double_quant": false,
+          "load_in_4bit": false,
+          "load_in_8bit": false,
+          "quantization": false
+        },
+        "query_rate": 1.0,
+        "random_seed": null,
+        "save_outputs": false,
+        "schedule_config": {
+          "at": null,
+          "days": null,
+          "enabled": false,
+          "interval": null,
+          "total_duration": "24h"
+        },
+        "sharding_config": {
+          "num_shards": 2,
+          "strategy": "tensor_parallel",
+          "tp_plan": "auto"
+        },
+        "streaming": false,
+        "streaming_warmup_requests": 5,
+        "task_type": "text_generation",
+        "tensorrt": null,
+        "vllm": null
+      },
+      "cli_overrides": {},
+      "config_warnings": []
+    },
+    {
+      "schema_version": "2.0.0",
+      "experiment_id": "0001_c3",
+      "backend": "pytorch",
+      "backend_version": "transformers=4.57.6, torch=2.5.1+cu124",
+      "process_index": 1,
+      "gpu_id": 1,
+      "gpu_name": "NVIDIA A100-PCIE-40GB",
+      "gpu_is_mig": false,
+      "gpu_mig_profile": null,
+      "energy_measurement_warning": null,
+      "config_name": "parallel_pt_tp_2gpu",
+      "model_name": "meta-llama/Llama-3.2-3B",
+      "timestamps": {
+        "start": "2026-01-20T12:40:33.320112",
+        "end": "2026-01-20T12:44:01.828218",
+        "duration_sec": 208.508106
+      },
+      "inference_metrics": {
+        "total_tokens": 32768,
+        "input_tokens": 16384,
+        "output_tokens": 16384,
+        "inference_time_sec": 199.39047611225396,
+        "tokens_per_second": 164.34084836405168,
+        "latency_per_token_ms": 6.084914432136657,
+        "time_to_first_token_ms": null,
+        "latency_measurements": null
+      },
+      "energy_metrics": {
+        "total_energy_j": 54998.508180911755,
+        "gpu_energy_j": 32708.995167163124,
+        "cpu_energy_j": 22158.496577781614,
+        "ram_energy_j": 131.01643596701504,
+        "gpu_power_w": 155.9374670690641,
+        "cpu_power_w": 112.5,
+        "duration_sec": 0.0,
+        "emissions_kg_co2": 0.000036317633069680464,
+        "energy_per_token_j": 0.0
+      },
+      "compute_metrics": {
+        "flops_total": 210550772465664.0,
+        "flops_per_token": 6425499648.0,
+        "flops_per_second": 1055972063315.2355,
+        "peak_memory_mb": 0.0,
+        "model_memory_mb": 0.0,
+        "flops_method": "parameter_estimate",
+        "flops_confidence": "low",
+        "compute_precision": "float16"
+      },
+      "effective_config": {
+        "adapter": null,
+        "backend": "pytorch",
+        "batching_options": {
+          "batch_size": 8,
+          "dynamic_batching": false,
+          "max_tokens_per_batch": null,
+          "strategy": "static"
+        },
+        "config_name": "parallel_pt_tp_2gpu",
+        "cycle_id": null,
+        "decode_token_to_text": false,
+        "decoder_config": {
+          "do_sample": false,
+          "min_p": 0.0,
+          "no_repeat_ngram_size": 0,
+          "preset": "deterministic",
+          "repetition_penalty": 1.0,
+          "temperature": 0.0,
+          "top_k": 50,
+          "top_p": 1.0
+        },
+        "extra_metadata": {},
+        "fp_precision": "float16",
+        "gpu_list": [
+          0,
+          1
+        ],
+        "inference_type": "pure_generative",
+        "io_config": {
+          "results_dir": null
+        },
+        "is_encoder_decoder": false,
+        "latency_simulation": {
+          "enabled": false,
+          "mode": "poisson",
+          "seed": null,
+          "target_qps": 1.0
+        },
+        "max_input_tokens": 128,
+        "max_output_tokens": 128,
+        "min_output_tokens": 0,
+        "model_name": "meta-llama/Llama-3.2-3B",
+        "num_cycles": 6,
+        "num_input_prompts": 128,
+        "num_processes": 2,
+        "prompt_source": {
+          "column": "text",
+          "dataset": "AIEnergyScore/text_generation",
+          "sample_size": 128,
+          "seed": 42,
+          "shuffle": false,
+          "split": "train",
+          "subset": null,
+          "type": "huggingface"
+        },
+        "pytorch": null,
+        "quantization_config": {
+          "bnb_4bit_compute_dtype": "float16",
+          "bnb_4bit_quant_type": "nf4",
+          "bnb_4bit_use_double_quant": false,
+          "load_in_4bit": false,
+          "load_in_8bit": false,
+          "quantization": false
+        },
+        "query_rate": 1.0,
+        "random_seed": null,
+        "save_outputs": false,
+        "schedule_config": {
+          "at": null,
+          "days": null,
+          "enabled": false,
+          "interval": null,
+          "total_duration": "24h"
+        },
+        "sharding_config": {
+          "num_shards": 2,
+          "strategy": "tensor_parallel",
+          "tp_plan": "auto"
+        },
+        "streaming": false,
+        "streaming_warmup_requests": 5,
+        "task_type": "text_generation",
+        "tensorrt": null,
+        "vllm": null
+      },
+      "cli_overrides": {},
+      "config_warnings": []
+    }
+  ],
+  "start_time": "2026-01-20T12:40:32.809176",
+  "end_time": "2026-01-20T12:44:01.833878",
+  "effective_config": {
+    "adapter": null,
+    "backend": "pytorch",
+    "batching_options": {
+      "batch_size": 8,
+      "dynamic_batching": false,
+      "max_tokens_per_batch": null,
+      "strategy": "static"
+    },
+    "config_name": "parallel_pt_tp_2gpu",
+    "cycle_id": null,
+    "decode_token_to_text": false,
+    "decoder_config": {
+      "do_sample": false,
+      "min_p": 0.0,
+      "no_repeat_ngram_size": 0,
+      "preset": "deterministic",
+      "repetition_penalty": 1.0,
+      "temperature": 0.0,
+      "top_k": 50,
+      "top_p": 1.0
+    },
+    "extra_metadata": {},
+    "fp_precision": "float16",
+    "gpu_list": [
+      0,
+      1
+    ],
+    "inference_type": "pure_generative",
+    "io_config": {
+      "results_dir": null
+    },
+    "is_encoder_decoder": false,
+    "latency_simulation": {
+      "enabled": false,
+      "mode": "poisson",
+      "seed": null,
+      "target_qps": 1.0
+    },
+    "max_input_tokens": 128,
+    "max_output_tokens": 128,
+    "min_output_tokens": 0,
+    "model_name": "meta-llama/Llama-3.2-3B",
+    "num_cycles": 6,
+    "num_input_prompts": 128,
+    "num_processes": 2,
+    "prompt_source": {
+      "column": "text",
+      "dataset": "AIEnergyScore/text_generation",
+      "sample_size": 128,
+      "seed": 42,
+      "shuffle": false,
+      "split": "train",
+      "subset": null,
+      "type": "huggingface"
+    },
+    "pytorch": null,
+    "quantization_config": {
+      "bnb_4bit_compute_dtype": "float16",
+      "bnb_4bit_quant_type": "nf4",
+      "bnb_4bit_use_double_quant": false,
+      "load_in_4bit": false,
+      "load_in_8bit": false,
+      "quantization": false
+    },
+    "query_rate": 1.0,
+    "random_seed": null,
+    "save_outputs": false,
+    "schedule_config": {
+      "at": null,
+      "days": null,
+      "enabled": false,
+      "interval": null,
+      "total_duration": "24h"
+    },
+    "sharding_config": {
+      "num_shards": 2,
+      "strategy": "tensor_parallel",
+      "tp_plan": "auto"
+    },
+    "streaming": false,
+    "streaming_warmup_requests": 5,
+    "task_type": "text_generation",
+    "tensorrt": null,
+    "vllm": null
+  },
+  "cli_overrides": {},
+  "config_warnings": [],
+  "latency_stats": null
+}
