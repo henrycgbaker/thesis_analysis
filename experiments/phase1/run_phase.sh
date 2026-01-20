@@ -13,9 +13,9 @@ if [ -f "${REPO_ROOT}/.env" ]; then
     set +a
 fi
 
-# TODO: Enable user mapping once tool fixes state dir permissions
-# export DOCKER_UID=$(id -u)
-# export DOCKER_GID=$(id -g)
+# PUID/PGID for host permission mapping (LinuxServer.io pattern)
+export PUID=$(id -u)
+export PGID=$(id -g)
 
 # Usage check
 if [ -z "$1" ]; then

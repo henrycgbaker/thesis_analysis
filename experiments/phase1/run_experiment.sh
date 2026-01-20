@@ -32,6 +32,10 @@ else
     echo "Using PyTorch backend..."
 fi
 
+# PUID/PGID for host permission mapping
+export PUID=$(id -u)
+export PGID=$(id -g)
+
 # Run the experiment
 cd "${TOOL_DIR}"
 docker compose run --rm \
