@@ -1,0 +1,7 @@
+{
+  "process_index": 0,
+  "gpu_id": 0,
+  "result_path": "/app/results/batching_dynamic/raw/0001_c1/process_0.json",
+  "timestamp": "2026-01-17T17:39:26.989835",
+  "result_hash": "sha256:cdcd28ea7d9f1832"
+}
