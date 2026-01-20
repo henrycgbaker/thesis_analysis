@@ -2,6 +2,6 @@
   "process_index": 0,
   "gpu_id": 0,
   "result_path": "/app/results/vllm_tp_2gpu/raw/0001_c2/process_0.json",
-  "timestamp": "2026-01-20T13:52:56.076387",
-  "result_hash": "sha256:35802854faa28617"
+  "timestamp": "2026-01-20T15:30:25.323025",
+  "result_hash": "sha256:7adc02a00f895841"
 }

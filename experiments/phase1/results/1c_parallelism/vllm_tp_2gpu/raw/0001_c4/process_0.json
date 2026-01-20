@@ -12,29 +12,29 @@
   "config_name": "parallel_vllm_tp_2gpu",
   "model_name": "meta-llama/Llama-3.2-3B",
   "timestamps": {
-    "start": "2026-01-20T13:54:03.132063",
-    "end": "2026-01-20T13:54:40.261385",
-    "duration_sec": 37.129322
+    "start": "2026-01-20T15:31:38.891503",
+    "end": "2026-01-20T15:32:15.827964",
+    "duration_sec": 36.936461
   },
   "inference_metrics": {
     "total_tokens": 23020,
     "input_tokens": 11383,
     "output_tokens": 11637,
-    "inference_time_sec": 2.1139413537457585,
-    "tokens_per_second": 10889.61146401254,
-    "latency_per_token_ms": 0.09183064090989394,
+    "inference_time_sec": 2.139250419102609,
+    "tokens_per_second": 10760.778539268265,
+    "latency_per_token_ms": 0.0929300790227024,
     "time_to_first_token_ms": null,
     "latency_measurements": null
   },
   "energy_metrics": {
-    "total_energy_j": 984.1113999797396,
-    "gpu_energy_j": 956.416765113488,
-    "cpu_energy_j": 1.1438203475466253,
-    "ram_energy_j": 26.550814518705014,
-    "gpu_power_w": 269.51091166048906,
-    "cpu_power_w": 0.31025390625,
+    "total_energy_j": 977.1355415383059,
+    "gpu_energy_j": 949.2537594049111,
+    "cpu_energy_j": 1.1324646922592365,
+    "ram_energy_j": 26.749317441135645,
+    "gpu_power_w": 276.17437955667236,
+    "cpu_power_w": 0.31582031250000003,
     "duration_sec": 0.0,
-    "emissions_kg_co2": 1.076332213178326e-6,
+    "emissions_kg_co2": 1.0687026489285454e-6,
     "energy_per_token_j": 0.0
   },
   "compute_metrics": {

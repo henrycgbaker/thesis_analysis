@@ -11,10 +11,10 @@
     "warnings": []
   },
   "total_tokens": 23020,
-  "total_energy_j": 981.519208498095,
-  "total_inference_time_sec": 2.1143179601058364,
-  "avg_tokens_per_second": 10887.671785585026,
-  "avg_energy_per_token_j": 0.04263767195908319,
+  "total_energy_j": 969.2520319717652,
+  "total_inference_time_sec": 2.13849834818393,
+  "avg_tokens_per_second": 10764.562909084872,
+  "avg_energy_per_token_j": 0.04210477984238772,
   "total_flops": 0.0,
   "process_results": [
     {
@@ -31,29 +31,29 @@
       "config_name": "parallel_vllm_tp_2gpu",
       "model_name": "meta-llama/Llama-3.2-3B",
       "timestamps": {
-        "start": "2026-01-20T13:52:19.760096",
-        "end": "2026-01-20T13:52:55.960546",
-        "duration_sec": 36.20045
+        "start": "2026-01-20T15:29:45.690956",
+        "end": "2026-01-20T15:30:25.198843",
+        "duration_sec": 39.507887
       },
       "inference_metrics": {
         "total_tokens": 23020,
         "input_tokens": 11383,
         "output_tokens": 11637,
-        "inference_time_sec": 2.1143179601058364,
-        "tokens_per_second": 10887.671785585026,
-        "latency_per_token_ms": 0.09184700087340732,
+        "inference_time_sec": 2.13849834818393,
+        "tokens_per_second": 10764.562909084872,
+        "latency_per_token_ms": 0.09289740869608731,
         "time_to_first_token_ms": null,
         "latency_measurements": null
       },
       "energy_metrics": {
-        "total_energy_j": 981.519208498095,
-        "gpu_energy_j": 953.9507631636468,
-        "cpu_energy_j": 1.0347166734325586,
-        "ram_energy_j": 26.53372866101563,
-        "gpu_power_w": 287.25146638236635,
-        "cpu_power_w": 0.3121093750000001,
+        "total_energy_j": 969.2520319717652,
+        "gpu_energy_j": 941.4007531148627,
+        "cpu_energy_j": 1.206430495291079,
+        "ram_energy_j": 26.64484836161137,
+        "gpu_power_w": 275.6098476118287,
+        "cpu_power_w": 0.32783203125000004,
         "duration_sec": 0.0,
-        "emissions_kg_co2": 1.0734971081338383e-6,
+        "emissions_kg_co2": 1.0600803778121433e-6,
         "energy_per_token_j": 0.0
       },
       "compute_metrics": {
@@ -184,8 +184,8 @@
       ]
     }
   ],
-  "start_time": "2026-01-20T13:52:19.760096",
-  "end_time": "2026-01-20T13:52:55.960546",
+  "start_time": "2026-01-20T15:29:45.690956",
+  "end_time": "2026-01-20T15:30:25.198843",
   "effective_config": {
     "adapter": null,
     "backend": "vllm",
