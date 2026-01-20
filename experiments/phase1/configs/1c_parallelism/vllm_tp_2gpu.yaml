@@ -8,7 +8,7 @@ max_output_tokens: 128
 num_input_prompts: 128
 
 gpus: [0, 1]
-num_processes: 2
+num_processes: 1  # vLLM handles TP internally
 num_cycles: 6  # 1 warm-up + 5 measurement
 
 batching:
@@ -23,9 +23,8 @@ sharding:
   num_shards: 2
 
 vllm:
-  gpu_memory_utilization: 0.7
-  max_num_seqs: 128
-  max_model_len: 2048
+  gpu_memory_utilization: 0.85
+  max_num_seqs: 256
 
 prompts:
   type: huggingface
